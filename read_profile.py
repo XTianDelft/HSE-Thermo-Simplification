@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+R_b = 0.1125
+
 df = pd.read_excel("profiles/profile-test.xlsx")
 heat_demand = df["Ruimteverwarming_W"]
 time = df["time"]
