@@ -1,0 +1,46 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+months = [
+    "jan",
+    "feb",
+    "mar",
+    "apr",
+    "may",
+    "jun",
+    "jul",
+    "aug",
+    "sep",
+    "oct",
+    "nov",
+    "dec",
+]
+
+def read_hourly_profile(filename):
+    df = pd.read_excel(filename)
+    heat_demand = df["Ruimteverwarming_W"].to_numpy()
+    # time = df["time"]
+    return heat_demand
+
+def plot_duration_curve(heat_demand):
+    duration_curve = np.sort(heat_demand)
+    first_0 = duration_curve.searchsorted(0, side='right')
+    plt.plot(duration_curve[first_0-1:][::-1] / 1e3)
+    # plt.xlim(0, len(heat_demand) - first_0)
+    plt.xlabel('hours of the year')
+    plt.ylim(0, None)
+    plt.ylabel('Heating load')
+
+# returns the baseload per month (in kWh/month) and the peak load per month (in kW/month)
+def read_monthly_profile(filename):
+    hourly_profile = read_hourly_profile(filename)
+    hours_per_month = 8760 // 12
+    monthly = hourly_profile.reshape((12, hours_per_month))
+
+    return monthly.sum(axis=1) / 1e3, monthly.max(axis=1) / 1e3
+
+def hourly_to_monthly(hourly_profile):
+    hours_per_month = 8760 // 12
+    monthly = hourly_profile.reshape((12, hours_per_month))
+    return monthly.sum(axis=1) / 1e3, monthly.max(axis=1) / 1e3
