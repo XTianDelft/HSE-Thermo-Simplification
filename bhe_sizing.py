@@ -18,8 +18,8 @@ profile_fn = "profiles/profile-test.xlsx"
 
 ground = GroundConstantTemperature(k_g, T_g, Cp)
 
-load_heat, peak_heat = read_monthly_profile(profile_fn)
-load = MonthlyGeothermalLoadAbsolute(load_heat, None, peak_heat, None)
+heat_profile = read_hourly_profile(profile_fn)
+load = HourlyBuildingLoad(heat_profile/1e3)
 
 borefield = Borefield(load=load)
 
@@ -32,14 +32,14 @@ borefield.set_min_avg_fluid_temperature(Tf_min)
 tilt = np.deg2rad(45)
 H = 30
 B = 1
-Nb = 8
+Nb = 5
 boreholes = [gt.boreholes.Borehole(H, 0, r_b, B*np.cos(phi), B*np.sin(phi), tilt=tilt, orientation=phi) for phi in np.linspace(0, 2*np.pi, Nb, endpoint=False)]
 gt_borefield = gt.borefield.Borefield.from_boreholes(boreholes)
 
 borefield.set_borefield(gt_borefield)
 # borefield.create_custom_dataset(options={'method': 'similarities'})
 
-length = borefield.size(L3_sizing=True)
+length = borefield.size(L4_sizing=True)
 print("The borehole length is: ", length, "m")
 print(f"{borefield.limiting_quadrant = }")
 
@@ -47,15 +47,15 @@ print(f"{borefield.limiting_quadrant = }")
 print("The borefield imbalance is: ", borefield.load.imbalance,
         "kWh/y. (A negative imbalance means the the field is heat extraction dominated so it cools down year after year.)")  # print imbalance
 
-borefield.results
+Tf = borefield.results.Tf
 
 # plot temperature profile for the calculated borehole length
-borefield.print_temperature_profile(legend=True)
+borefield.print_temperature_profile(legend=True, plot_hourly=True)
 
 # plot temperature profile for a fixed borehole length
 # borefield.print_temperature_profile_fixed_length(length=75, legend=False)
 
 # print gives the array of monthly temperatures for peak cooling without showing the plot
-# borefield.calculate_temperatures(length=90)
+borefield.calculate_temperatures(length=90)
 # print("Result array for cooling peaks")
 # print(borefield.results.peak_injection)
