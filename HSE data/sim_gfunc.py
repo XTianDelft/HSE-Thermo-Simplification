@@ -4,6 +4,12 @@ import pygfunction as gt
 import time
 import pickle
 
+# this is mostly from the example:
+# Simulation of fluid temperatures in a field of multiple boreholes¶
+# https://pygfunction.readthedocs.io/en/stable/examples/fluid_temperature_multiple_boreholes.html
+
+
+
 T_g = 10
 
 k_g = 1.2
@@ -86,6 +92,7 @@ Q_tot = Q_tot[:Nt].reshape(-1, 4).sum(axis=1)
 
 m_flow_network = power_df['Flow_Rate'].to_numpy()
 m_flow_network = m_flow_network[:Nt].reshape(-1, 4).mean(axis=1)
+m_flow_borehole = m_flow_network / Nb
 
 inlet_temps = power_df['Inlet_Temperature'].to_numpy()
 inlet_temps = inlet_temps[:Nt].reshape(-1, 4).mean(axis=1)
