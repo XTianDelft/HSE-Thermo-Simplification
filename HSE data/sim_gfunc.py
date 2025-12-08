@@ -101,6 +101,41 @@ outlet_temps = power_df['Return_Temperature'].to_numpy()
 outlet_temps = outlet_temps[:Nt].reshape(-1, 4).mean(axis=1)
 
 
+
+# --- NETWORK DEFINITION ---
+
+# 1. Define Pipe & Grout Properties (Standard HDPE assumptions)
+r_out = 0.020  # Pipe outer radius (m) - approx 40mm diameter
+r_in = 0.017  # Pipe inner radius (m)
+D_s = 0.06  # Shank spacing (distance between pipe centers in m)
+k_p = 0.4  # Pipe thermal conductivity (W/m.K)
+k_s = 2.0  # Grout thermal conductivity (W/m.K)
+epsilon = 1.0e-6  # Pipe roughness (m)
+
+
+pipes = []
+for bh in boreholes:
+    # Generate pipe positions inside the borehole
+    pos = gt.pipes.SingleUTube.positions(bh.r_b, D_s)
+
+    # Create the pipe object
+    pipe = gt.pipes.SingleUTube(
+        pos, r_in, r_out, bh, k_s=k_s, k_g=k_g, k_p=k_p
+    )
+    pipes.append(pipe)
+
+# 3. Create the Network
+network = gt.networks.Network(
+    boreholes,
+    pipes,
+    is_parallel=True,# We assume boreholes in parallel
+    m_flow_network=m_flow_network[0],  # Initial flow estimate
+    cp_f=cp_f
+)
+
+# === NETWORK DEFINITION ===
+
+
 dt = 3600
 tmax = len(Q_tot) * 3600
 LoadAgg = gt.load_aggregation.ClaessonJaved(dt, tmax)
@@ -140,11 +175,11 @@ for i in range(Nt):
 
     # Evaluate inlet fluid temperature (all boreholes are the same)
     T_f_in[i] = network.get_network_inlet_temperature(
-            Q_tot[i], T_b[i], m_flow_network, cp_f, nSegments=1)
+            Q_tot[i], T_b[i], m_flow_network[i], cp_f, nSegments=1)
 
     # Evaluate outlet fluid temperature
     T_f_out[i] = network.get_network_outlet_temperature(
-            T_f_in[i],  T_b[i], m_flow_network, cp_f, nSegments=1)
+            T_f_in[i],  T_b[i], m_flow_network[i], cp_f, nSegments=1)
 
 
 # Configure figure and axes
