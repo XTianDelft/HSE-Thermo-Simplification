@@ -4,31 +4,29 @@ import pygfunction as gt
 import time
 import pickle
 
-# this is mostly from the example:
-# Simulation of fluid temperatures in a field of multiple boreholes¶
+# This is mostly from the following example:
+# 'Simulation of fluid temperatures in a field of multiple boreholes'
 # https://pygfunction.readthedocs.io/en/stable/examples/fluid_temperature_multiple_boreholes.html
 
+# All units are in SI units
+# distance: m
+# density: kg/m^3
+# thermal conductivity: W/m/K
+# heat capacity: J/kg/K
+# etc...
 
-
-T_g = 10
-
-k_g = 1.2
-rho = 1700
-cp = 1800
-alpha = k_g / (rho * cp)
-
-# https://pygfunction.readthedocs.io/en/stable/modules/media.html
-fluid = gt.media.Fluid('MPG', 20) # 20% propylene glycol in water at T=20°C
-cp_f = fluid.cp
+# Soil properties (as chosen in the COMSOL model)
+# TODO: consider more realistic assumptions here
+T_g = 8     # Undisturbed soil temperature
+k_s = 1.2   # Soil thermal conductivity
+rho = 1700  # Density of the soil
+cp = 1800   # Heat capacity of the soil
+alpha = k_s / (rho * cp)
 
 # alpha = 1e-6
 print(f"α = {alpha:.2e}")
 
-B = 0.707
-D = 0
-
-r_b = 0.125  # Borehole radius (m)
-
+# Borefield dimensions (lengths and directions)
 Hs = np.array([40, 42.4, 32.9, 41.8, 42, 42, 34.95, 43.5, 40])
 H_mean = Hs.mean()
 ts = H_mean ** 2 / (9 * alpha)
@@ -64,6 +62,9 @@ dr = np.sqrt(dx**2 + dy**2)
 phi = np.arctan2(dr, -dz)
 theta = np.arctan2(dy, dx)
 
+D = 0  # The burried depth is 0 meter
+r_b = 0.125  # Borehole radius, including grout
+
 boreholes = [
     gt.boreholes.Borehole(Hs[i], D, r_b, *locs[i], tilt=phi[i], orientation=theta[i])
     for i in range(Nb)
@@ -81,60 +82,90 @@ print(f"H_mean: {H_mean:.2f} m,\tsteady state time = {ts / (3600*24*365.25):.2f}
 # plt.close()
 
 
-# very crude hourly energy in kWh/h
-with open('./outputs/EnergyMeter_outputs.pkl', 'rb') as f:
-    power_df = pickle.load(f)['power_df']
+# Pipe dimensions (coaxial)
+r_in_in = 0.022/2    # Inside pipe inner radius
+r_in_out = 0.025/2   # Inside pipe outer radius
+r_mid_in = 0.029/2   # Middle pipe inner radius
+r_mid_out = 0.032/2  # Middle pipe outer radius
+r_out_in = 0.155/2   # Outer pipe inside radius
+r_out_out = 0.160/2  # Outer pipe outside radius
+
+k_p = 0.19    # Pipe thermal conductivity
+k_g = 2.0     # Grout thermal conductivity
+k_gap = 0.026 # Thermal conductivity of the air between the inner and middle pipe
 
 
-Nt = len(power_df)//4*4
-Q_tot = power_df['Power_Energy_kWh'].to_numpy()
-Q_tot = Q_tot[:Nt].reshape(-1, 4).sum(axis=1)
-
-m_flow_network = power_df['Flow_Rate'].to_numpy()
-m_flow_network = m_flow_network[:Nt].reshape(-1, 4).mean(axis=1)
-m_flow_borehole = m_flow_network / Nb
-
-inlet_temps = power_df['Inlet_Temperature'].to_numpy()
-inlet_temps = inlet_temps[:Nt].reshape(-1, 4).mean(axis=1)
-
-outlet_temps = power_df['Return_Temperature'].to_numpy()
-outlet_temps = outlet_temps[:Nt].reshape(-1, 4).mean(axis=1)
+pos = (0, 0) # position with respect to the borehole
+r_inner = np.array([r_in_in, r_out_in])
+r_outer = np.array([r_mid_out, r_out_out]) # regard the OD of the middle pipe as the OD
 
 
+# Fluid properties; NOTE: these are different from the values used in COMSOL
+# https://pygfunction.readthedocs.io/en/stable/modules/media.html
+fluid = gt.media.Fluid('MEG', 14) # 14% ethylene glycol in water at T=20°C
+cp_f = fluid.cp     # Fluid specific isobaric heat capacity
+rho_f = fluid.rho   # Fluid density
+mu_f = fluid.mu     # Fluid dynamic viscosity (kg/m.s)
+k_f = fluid.k       # Fluid thermal conductivity
 
-# --- NETWORK DEFINITION ---
+flow_rate = 12.5    # Flow rate in m^3/hour; # TODO: verify this
+m_flow_borehole = flow_rate/3600*rho_f # Total fluid mass flow rate per borehole (kg/s)
 
-# 1. Define Pipe & Grout Properties (Standard HDPE assumptions)
-r_out = 0.020  # Pipe outer radius (m) - approx 40mm diameter
-r_in = 0.017  # Pipe inner radius (m)
-D_s = 0.06  # Shank spacing (distance between pipe centers in m)
-k_p = 0.4  # Pipe thermal conductivity (W/m.K)
-k_s = 2.0  # Grout thermal conductivity (W/m.K)
-epsilon = 1.0e-6  # Pipe roughness (m)
+# For the convection and conduction calculations we use the functions from the pygfunction library.
+# These are different from the formulas used in COMSOL.
+epsilon = 1.0e-6  # Pipe roughness (m); TODO: smooth vs corrugated HDPE
+
+# Pipe conduction thermal resistances
+R_in_pipe = gt.pipes.conduction_thermal_resistance_circular_pipe(r_in_in, r_in_out, k_p)
+R_mid_pipe = gt.pipes.conduction_thermal_resistance_circular_pipe(r_mid_in, r_mid_out, k_p)
+R_mid_gap = gt.pipes.conduction_thermal_resistance_circular_pipe(r_in_out, r_mid_in, k_gap)
+R_out_pipe = gt.pipes.conduction_thermal_resistance_circular_pipe(r_out_in, r_out_out, k_p)
+
+# Fluid convection thermal resistances
+h_f_in = gt.pipes.convective_heat_transfer_coefficient_circular_pipe(
+        m_flow_borehole, r_in_in, mu_f, rho_f, k_f, cp_f, epsilon)
+R_in_conv = 1 / (h_f_in * 2 * np.pi * r_in_in)
+
+h_f_ann_inner, h_f_ann_outer = gt.pipes.convective_heat_transfer_coefficient_concentric_annulus(
+            m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon)
+R_ann_out_conv = 1 / (h_f_ann_outer * 2 * np.pi * r_out_in)
+R_ann_in_conv = 1 / (h_f_ann_inner * 2 * np.pi * r_mid_out)
+
+R_ff = R_in_conv + R_in_pipe + R_mid_gap + R_mid_pipe + R_ann_in_conv
+R_fp = R_out_pipe + R_ann_out_conv
+
+print(f'{R_ff = :.3f}, {R_fp = :.3f}')
 
 
 pipes = []
-for bh in boreholes:
-    # Generate pipe positions inside the borehole
-    pos = gt.pipes.SingleUTube.positions(bh.r_b, D_s)
-
-    # Create the pipe object
-    pipe = gt.pipes.SingleUTube(
-        pos, r_in, r_out, bh, k_s=k_s, k_g=k_g, k_p=k_p
-    )
+for borehole in boreholes:
+    pipe = gt.pipes.Coaxial(pos, r_inner, r_outer, borehole, k_s, k_g, R_ff, R_fp, J=2)
     pipes.append(pipe)
 
-# 3. Create the Network
+    R_b = pipe.effective_borehole_thermal_resistance(
+        m_flow_borehole, fluid.cp)
+    print(f'Coaxial tube borehole thermal resistance: {R_b:.4f} m.K/W')
+
 network = gt.networks.Network(
     boreholes,
     pipes,
-    is_parallel=True,# We assume boreholes in parallel
-    m_flow_network=m_flow_network[0],  # Initial flow estimate
+    m_flow_network=m_flow_borehole*Nb,  # Initial flow estimate
     cp_f=cp_f
 )
 
-# === NETWORK DEFINITION ===
 
+# very crude hourly energy in kWh/h
+with open('./outputs/EnergyMeter_outputs.pkl', 'rb') as f:
+    aggregated_df = pickle.load(f)['aggregated_df']
+
+Nt = len(aggregated_df)
+Q_tot = aggregated_df['Power_KW'].to_numpy()*1e3
+
+m_flow_network = aggregated_df['Flow_Rate'].to_numpy()
+m_flow_borehole = m_flow_network / Nb
+
+inlet_temps = aggregated_df['Inlet_Temperature'].to_numpy()
+outlet_temps = aggregated_df['Return_Temperature'].to_numpy()
 
 dt = 3600
 tmax = len(Q_tot) * 3600
@@ -153,7 +184,7 @@ gfunc = gt.gfunction.gFunction(
 # gfunc.visualize_g_function()
 # plt.savefig('gfunc.pdf')
 
-LoadAgg.initialize(gfunc.gFunc / (2 * np.pi * k_g))
+LoadAgg.initialize(gfunc.gFunc / (2 * np.pi * k_s))
 
 T_b = np.zeros(Nt)
 T_f_in = np.zeros(Nt)
@@ -184,6 +215,7 @@ for i in range(Nt):
 
 # Configure figure and axes
 fig = gt.utilities._initialize_figure()
+fig.set_size_inches(8, 8)
 
 ax1 = fig.add_subplot(211)
 # Axis labels
@@ -209,3 +241,5 @@ ax2.legend()
 
 # Adjust to plot window
 plt.tight_layout()
+plt.savefig('network-data.pdf')
+plt.show()

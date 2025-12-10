@@ -6,7 +6,6 @@ import numpy as np
 
 
 
-exit()
 filename = './Trend EM WP.xlsx'
 df = pd.read_excel(filename)
 
