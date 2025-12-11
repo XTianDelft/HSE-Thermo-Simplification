@@ -17,7 +17,7 @@ import pickle
 
 # Soil properties (as chosen in the COMSOL model)
 # TODO: consider more realistic assumptions here
-T_g = 8     # Undisturbed soil temperature
+T_g = 10     # Undisturbed soil temperature
 k_s = 1.2   # Soil thermal conductivity
 rho = 1700  # Density of the soil
 cp = 1800   # Heat capacity of the soil
@@ -28,6 +28,7 @@ print(f"α = {alpha:.2e}")
 
 # Borefield dimensions (lengths and directions)
 Hs = np.array([40, 42.4, 32.9, 41.8, 42, 42, 34.95, 43.5, 40])
+Nb = len(Hs)
 H_mean = Hs.mean()
 ts = H_mean ** 2 / (9 * alpha)
 dirs = np.array(
@@ -56,7 +57,6 @@ locs = np.array(
         (-0.707 * 0.7, 0),
     ]
 )
-Nb = len(dirs)
 dx, dy, dz = dirs.T
 dr = np.sqrt(dx**2 + dy**2)
 phi = np.arctan2(dr, -dz)
@@ -81,7 +81,6 @@ print(f"H_mean: {H_mean:.2f} m,\tsteady state time = {ts / (3600*24*365.25):.2f}
 # plt.savefig('setup.pdf')
 # plt.close()
 
-
 # Pipe dimensions (coaxial)
 r_in_in = 0.022/2    # Inside pipe inner radius
 r_in_out = 0.025/2   # Inside pipe outer radius
@@ -93,7 +92,6 @@ r_out_out = 0.160/2  # Outer pipe outside radius
 k_p = 0.19    # Pipe thermal conductivity
 k_g = 2.0     # Grout thermal conductivity
 k_gap = 0.026 # Thermal conductivity of the air between the inner and middle pipe
-
 
 pos = (0, 0) # position with respect to the borehole
 r_inner = np.array([r_in_in, r_out_in])
@@ -108,12 +106,12 @@ rho_f = fluid.rho   # Fluid density
 mu_f = fluid.mu     # Fluid dynamic viscosity (kg/m.s)
 k_f = fluid.k       # Fluid thermal conductivity
 
-flow_rate = 12.5    # Flow rate in m^3/hour; # TODO: verify this
+flow_rate = 3    # Flow rate in m^3/hour; # TODO: verify this
 m_flow_borehole = flow_rate/3600*rho_f # Total fluid mass flow rate per borehole (kg/s)
 
 # For the convection and conduction calculations we use the functions from the pygfunction library.
 # These are different from the formulas used in COMSOL.
-epsilon = 1.0e-6  # Pipe roughness (m); TODO: smooth vs corrugated HDPE
+epsilon = 1.0e-6  # Pipe roughness (m); TODO: validate this
 
 # Pipe conduction thermal resistances
 R_in_pipe = gt.pipes.conduction_thermal_resistance_circular_pipe(r_in_in, r_in_out, k_p)
@@ -154,18 +152,18 @@ network = gt.networks.Network(
 )
 
 
-# very crude hourly energy in kWh/h
 with open('./outputs/EnergyMeter_outputs.pkl', 'rb') as f:
     aggregated_df = pickle.load(f)['aggregated_df']
 
+# divide values from the  by 4, because the values are summed
 Nt = len(aggregated_df)
-Q_tot = aggregated_df['Power_KW'].to_numpy()*1e3
+Q_tot = aggregated_df['Power_KW'].to_numpy()/4*1e3
 
-m_flow_network = aggregated_df['Flow_Rate'].to_numpy()
+m_flow_network = aggregated_df['Flow_Rate'].to_numpy()/4  # divide by 4, because the values are summed
 m_flow_borehole = m_flow_network / Nb
 
-inlet_temps = aggregated_df['Inlet_Temperature'].to_numpy()
-outlet_temps = aggregated_df['Return_Temperature'].to_numpy()
+inlet_temps = aggregated_df['Inlet_Temperature'].to_numpy()/4
+outlet_temps = aggregated_df['Return_Temperature'].to_numpy()/4
 
 dt = 3600
 tmax = len(Q_tot) * 3600
@@ -174,10 +172,10 @@ time_req = LoadAgg.get_times_for_simulation()
 
 # time_arr = gt.utilities.time_geometric(3600, 20 * 8766 * 3600, 8)
 gfunc = gt.gfunction.gFunction(
-    borefield,
+    network,
     alpha,
     time=time_req,
-    boundary_condition="UBWT",
+    boundary_condition="MIFT",
     method="similarities",
     options={'disp': True}
 )
@@ -191,14 +189,17 @@ T_f_in = np.zeros(Nt)
 T_f_out = np.zeros(Nt)
 
 for i in range(Nt):
+    if i % 50 == 0:
+        print(f'{i*100/Nt:.2f}%', end='\r')
+
     # Increment time step by (1)
     LoadAgg.next_time_step(i*3600)
 
     Q_i = Q_tot[i]
 
     # Apply current load (in watts per meter of borehole)
-    Q_b = Q_i/Nb
-    LoadAgg.set_current_load(Q_b/H_mean)
+    q_b = Q_i/(Nb*H_mean)
+    LoadAgg.set_current_load(q_b)
 
     # Evaluate borehole wall temperature
     deltaT_b = LoadAgg.temporal_superposition()
@@ -206,40 +207,50 @@ for i in range(Nt):
 
     # Evaluate inlet fluid temperature (all boreholes are the same)
     T_f_in[i] = network.get_network_inlet_temperature(
-            Q_tot[i], T_b[i], m_flow_network[i], cp_f, nSegments=1)
+            Q_tot[i], T_b[i], m_flow_network[i], cp_f, nSegments=12)
 
     # Evaluate outlet fluid temperature
     T_f_out[i] = network.get_network_outlet_temperature(
-            T_f_in[i],  T_b[i], m_flow_network[i], cp_f, nSegments=1)
+            T_f_in[i],  T_b[i], m_flow_network[i], cp_f, nSegments=12)
 
 
 # Configure figure and axes
 fig = gt.utilities._initialize_figure()
-fig.set_size_inches(8, 8)
+fig.set_size_inches(8, 10)
 
-ax1 = fig.add_subplot(211)
+ax1 = fig.add_subplot(311)
 # Axis labels
-ax1.set_xlabel(r'Time [hours]')
-ax1.set_ylabel(r'Total heat extraction rate [W]')
+ax1.set_ylabel(r'Total heat extraction rate (W)')
 gt.utilities._format_axes(ax1)
 
 # Plot heat extraction rates
 hours = np.arange(1, Nt+1) * dt / 3600.
-ax1.plot(hours, Q_tot)
+is_extracting = Q_tot>=0
+ax1.scatter(hours[is_extracting], Q_tot[is_extracting], c='red', s=3, label='heat extraction')
+ax1.scatter(hours[~is_extracting], Q_tot[~is_extracting], c='blue', s=3, label='heat injection')
+ax1.legend(loc='upper left')
 
-ax2 = fig.add_subplot(212)
-# Axis labels
-ax2.set_xlabel(r'Time [hours]')
-ax2.set_ylabel(r'Temperature [degC]')
+ax2 = fig.add_subplot(312, sharex = ax1)
+ax2.set_ylabel(r'Temperature (°C)')
 gt.utilities._format_axes(ax2)
 
-# Plot temperatures
-ax2.plot(hours, T_b, label='Borehole wall')
-ax2.plot(hours, T_f_out, '-.',
-            label='Outlet, double U-tube (parallel)')
-ax2.legend()
+# ax2.plot(hours, T_b, label='Borehole wall')
+ax2.plot(hours, T_f_in, label='Model inlet')
+ax2.plot(hours, inlet_temps, label='Measured inlet')
+ax2.legend(loc='upper left')
+
+ax3 = fig.add_subplot(313, sharex = ax1)
+ax3.set_xlabel(r'Time (hours)')
+ax3.set_ylabel(r'Temperature (°C)')
+gt.utilities._format_axes(ax3)
+
+ax3.plot(hours, T_f_out, label='Model outlet')
+ax3.plot(hours, outlet_temps, label='Measured outlet')
+ax3.legend(loc='upper left')
 
 # Adjust to plot window
 plt.tight_layout()
+plt.subplots_adjust(hspace=.0)
 plt.savefig('network-data.pdf')
+plt.savefig('network-data.png', dpi=360)
 plt.show()
