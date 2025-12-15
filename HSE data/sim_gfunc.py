@@ -16,12 +16,17 @@ import pickle
 # etc...
 
 # Soil properties (as chosen in the COMSOL model)
-# TODO: consider more realistic assumptions here
-T_g = 10     # Undisturbed soil temperature
-k_s = 1.2   # Soil thermal conductivity
-rho = 1700  # Density of the soil
-cp = 1800   # Heat capacity of the soil
-alpha = k_s / (rho * cp)
+# T_g = 8     # Undisturbed soil temperature
+# k_s = 1.2   # Soil thermal conductivity
+# rho = 1700  # Density of the soil
+# cp = 1800   # Specific heat capacity of the soil
+# alpha = k_s / (rho * cp)
+
+# Soil properties (modified: https://hess.copernicus.org/articles/22/1491/2018/hess-22-1491-2018-t01.pdf)
+T_g = 10      # Undisturbed soil temperature
+k_s = 2.8     # Soil thermal conductivity
+cp_v = 2.8e6  # Volumetric heat capacity of the soil
+alpha = k_s / cp_v
 
 # alpha = 1e-6
 print(f"α = {alpha:.2e}")
@@ -98,7 +103,6 @@ pos = (0, 0) # position with respect to the borehole
 r_inner = np.array([r_in_in, r_out_in])
 r_outer = np.array([r_mid_out, r_out_out]) # regard the OD of the middle pipe as the OD
 
-
 # Fluid properties; NOTE: these are different from the values used in COMSOL
 # https://pygfunction.readthedocs.io/en/stable/modules/media.html
 fluid = gt.media.Fluid('MEG', 14) # 14% ethylene glycol in water at T=20°C
@@ -107,8 +111,8 @@ rho_f = fluid.rho   # Fluid density
 mu_f = fluid.mu     # Fluid dynamic viscosity (kg/m.s)
 k_f = fluid.k       # Fluid thermal conductivity
 
-flow_rate = 3    # Flow rate in m^3/hour; # TODO: verify this
-m_flow_borehole = flow_rate/3600*rho_f # Total fluid mass flow rate per borehole (kg/s)
+flow_rate = 3    # Flow rate in m^3/hour; # TODO: fix this
+m_flow_borehole = flow_rate/3600*rho_f/Nb # Total fluid mass flow rate per borehole (kg/s)
 
 # For the convection and conduction calculations we use the functions from the pygfunction library.
 # These are different from the formulas used in COMSOL.
@@ -162,8 +166,8 @@ with open('./outputs/EnergyMeter_outputs.pkl', 'rb') as f:
 Nt = len(aggregated_df)
 Q_tot = aggregated_df['Power_KW'].to_numpy().clip(0, None)/4*1e3  # negative values are errors, so then we set the power to 0
 
-m_flow_network = aggregated_df['Flow_Rate'].to_numpy()/4  # divide by 4, because the values are summed
-m_flow_borehole = m_flow_network / Nb
+flow_rate = aggregated_df['Flow_Rate'].to_numpy()/4  # divide by 4, because the values are summed
+flow_rate_kgs = flow_rate/3600*rho_f
 
 inlet_temps = aggregated_df['Inlet_Temperature'].to_numpy()/4
 outlet_temps = aggregated_df['Return_Temperature'].to_numpy()/4
@@ -203,7 +207,7 @@ for i in range(Nt):
     Q_i = Q_tot[i]
 
     # Apply current load (in watts per meter of borehole)
-    q_b = Q_i/(Nb*H_mean)
+    q_b = Q_i/Hs.sum()
     LoadAgg.set_current_load(q_b)
 
     # Evaluate borehole wall temperature
@@ -212,36 +216,39 @@ for i in range(Nt):
 
     # Evaluate inlet fluid temperature (all boreholes are the same)
     T_f_in[i] = network.get_network_inlet_temperature(
-            Q_tot[i], T_b[i], m_flow_network[i]+0.01, cp_f, nSegments=12)
+            Q_tot[i], T_b[i], flow_rate_kgs[i]+0.01, cp_f, nSegments=12)
 
     # Evaluate outlet fluid temperature
     T_f_out[i] = network.get_network_outlet_temperature(
-            T_f_in[i],  T_b[i], m_flow_network[i]+0.01, cp_f, nSegments=12)
-
+            T_f_in[i],  T_b[i], flow_rate_kgs[i]+0.01, cp_f, nSegments=12)
 
 # Configure figure and axes
 fig = gt.utilities._initialize_figure()
 fig.set_size_inches(8, 10)
 
 ax1 = fig.add_subplot(311)
+plt.sca(ax1)
 # Axis labels
-ax1.set_ylabel(r'Total heat extraction rate (W)')
-gt.utilities._format_axes(ax1)
-
+plt.ylabel(r'Total heat extraction rate (W)')
+plt.xlim(timestamps.min(), timestamps.max())
+gt.utilities._format_axes(plt.gca())
+plt.setp(plt.gca().get_xticklabels(), visible=False)
 # Plot heat extraction rates
-ax1.scatter(timestamps, Q_tot, c='red', s=3, label='heat extraction')
-ax1.legend(loc='upper left')
+Q_calc = flow_rate_kgs * cp_f * (T_f_out - T_f_in)
+plt.scatter(timestamps, Q_calc, c='blue', s=1, label='model heat extraction')
+plt.scatter(timestamps, Q_tot, c='red', s=1, label='heat extraction')
+plt.legend(loc='upper left')
 
 ax2 = fig.add_subplot(312, sharex = ax1)
-ax2.set_ylabel(r'Borehole temps (°C)')
-gt.utilities._format_axes(ax2)
-ax2.plot(timestamps, T_b, c='tab:blue', label='Model T_b')
+plt.sca(ax2)
+plt.ylabel(r'Temps (°C)')
+gt.utilities._format_axes(plt.gca())
+plt.setp(plt.gca().get_xticklabels(), visible=False)
+plt.plot(timestamps, (T_f_in + T_f_out)/2, c='tab:blue', label='Model T_m')
 T_m = (inlet_temps + outlet_temps)/2
-T_w = T_m - Q_tot/Hs.sum()*0.076
-ax2.plot(timestamps, T_w, c='tab:orange', label='Measured T_w')
-ax2.set_ylim(-2, 10)
-ax2.legend()
-
+plt.plot(timestamps, T_m, c='tab:orange', label='Measured T_m')
+plt.ylim(-2, 10)
+plt.legend()
 
 
 
@@ -250,17 +257,18 @@ ax2.legend()
 # ax2.plot(timestamps, inlet_temps, label='Measured inlet')
 # ax2.legend(loc='upper left')
 
-ax3 = fig.add_subplot(313, sharex = ax1)
-ax3.set_xlabel(r'Time (hours)')
-ax3.set_ylabel(r'Temperature (°C)')
-gt.utilities._format_axes(ax3)
+ax3 = fig.add_subplot(313, sharex = ax1, sharey = ax2)
+plt.sca(ax3)
+plt.xlabel(r'Time (hours)')
+plt.ylabel(r'Temperature (°C)')
+gt.utilities._format_axes(plt.gca())
 
-ax3.plot(timestamps, T_f_in, c='tab:blue', lw=1, ls='--', label='Model inlet')
-ax3.plot(timestamps, inlet_temps, c='tab:orange', lw=1, ls='--', label='Measured inlet')
-ax3.plot(timestamps, T_f_out, c='tab:blue', lw=1, ls='-', label='Model outlet')
-ax3.plot(timestamps, outlet_temps, c='tab:orange', lw=1, ls='-', label='Measured outlet')
-ax3.set_ylim(-2, 10)
-ax3.legend(loc='upper left')
+plt.plot(timestamps, T_f_in, c='tab:blue', lw=1, ls='--', label='Model inlet')
+plt.plot(timestamps, inlet_temps, c='tab:orange', lw=1, ls='--', label='Measured inlet')
+plt.plot(timestamps, T_f_out, c='tab:blue', lw=1, ls='-', label='Model outlet')
+plt.plot(timestamps, outlet_temps, c='tab:orange', lw=1, ls='-', label='Measured outlet')
+plt.ylim(-2, 10)
+plt.legend(loc='upper left')
 
 # Adjust to plot window
 plt.tight_layout()
