@@ -90,6 +90,7 @@ r_out_in = 0.155/2   # Outer pipe inside radius
 r_out_out = 0.160/2  # Outer pipe outside radius
 
 k_p = 0.19    # Pipe thermal conductivity
+# k_p = 0.05
 k_g = 2.0     # Grout thermal conductivity
 k_gap = 0.026 # Thermal conductivity of the air between the inner and middle pipe
 
@@ -118,6 +119,7 @@ R_in_pipe = gt.pipes.conduction_thermal_resistance_circular_pipe(r_in_in, r_in_o
 R_mid_pipe = gt.pipes.conduction_thermal_resistance_circular_pipe(r_mid_in, r_mid_out, k_p)
 R_mid_gap = gt.pipes.conduction_thermal_resistance_circular_pipe(r_in_out, r_mid_in, k_gap)
 R_out_pipe = gt.pipes.conduction_thermal_resistance_circular_pipe(r_out_in, r_out_out, k_p)
+R_grout = gt.pipes.conduction_thermal_resistance_circular_pipe(r_out_out, r_b, k_g)
 
 # Fluid convection thermal resistances
 h_f_in = gt.pipes.convective_heat_transfer_coefficient_circular_pipe(
@@ -132,7 +134,8 @@ R_ann_in_conv = 1 / (h_f_ann_inner * 2 * np.pi * r_mid_out)
 R_ff = R_in_conv + R_in_pipe + R_mid_gap + R_mid_pipe + R_ann_in_conv
 R_fp = R_out_pipe + R_ann_out_conv
 
-print(f'{R_ff = :.3f}, {R_fp = :.3f}')
+print(f'{h_f_in = :.3f} {h_f_ann_inner = :.3f} {h_f_ann_outer = :.3f}')
+print(f'{R_ff = :.3f}, {R_fp = :.3f}, {R_out_pipe = :.3f}, {R_grout = :.3f}, ')
 
 
 pipes = []
@@ -153,17 +156,19 @@ network = gt.networks.Network(
 
 
 with open('./outputs/EnergyMeter_outputs.pkl', 'rb') as f:
-    aggregated_df = pickle.load(f)['aggregated_df']
+    aggregated_df = pickle.load(f)['aggregated_df'][:2880]
 
 # divide values from the  by 4, because the values are summed
 Nt = len(aggregated_df)
-Q_tot = aggregated_df['Power_KW'].to_numpy()/4*1e3
+Q_tot = aggregated_df['Power_KW'].to_numpy().clip(0, None)/4*1e3  # negative values are errors, so then we set the power to 0
 
 m_flow_network = aggregated_df['Flow_Rate'].to_numpy()/4  # divide by 4, because the values are summed
 m_flow_borehole = m_flow_network / Nb
 
 inlet_temps = aggregated_df['Inlet_Temperature'].to_numpy()/4
 outlet_temps = aggregated_df['Return_Temperature'].to_numpy()/4
+delta_temps = aggregated_df['Delta_T'].to_numpy()/4
+timestamps = aggregated_df.index
 
 dt = 3600
 tmax = len(Q_tot) * 3600
@@ -207,11 +212,11 @@ for i in range(Nt):
 
     # Evaluate inlet fluid temperature (all boreholes are the same)
     T_f_in[i] = network.get_network_inlet_temperature(
-            Q_tot[i], T_b[i], m_flow_network[i], cp_f, nSegments=12)
+            Q_tot[i], T_b[i], m_flow_network[i]+0.01, cp_f, nSegments=12)
 
     # Evaluate outlet fluid temperature
     T_f_out[i] = network.get_network_outlet_temperature(
-            T_f_in[i],  T_b[i], m_flow_network[i], cp_f, nSegments=12)
+            T_f_in[i],  T_b[i], m_flow_network[i]+0.01, cp_f, nSegments=12)
 
 
 # Configure figure and axes
@@ -224,28 +229,37 @@ ax1.set_ylabel(r'Total heat extraction rate (W)')
 gt.utilities._format_axes(ax1)
 
 # Plot heat extraction rates
-hours = np.arange(1, Nt+1) * dt / 3600.
-is_extracting = Q_tot>=0
-ax1.scatter(hours[is_extracting], Q_tot[is_extracting], c='red', s=3, label='heat extraction')
-ax1.scatter(hours[~is_extracting], Q_tot[~is_extracting], c='blue', s=3, label='heat injection')
+ax1.scatter(timestamps, Q_tot, c='red', s=3, label='heat extraction')
 ax1.legend(loc='upper left')
 
 ax2 = fig.add_subplot(312, sharex = ax1)
-ax2.set_ylabel(r'Temperature (°C)')
+ax2.set_ylabel(r'Borehole temps (°C)')
 gt.utilities._format_axes(ax2)
+ax2.plot(timestamps, T_b, c='tab:blue', label='Model T_b')
+T_m = (inlet_temps + outlet_temps)/2
+T_w = T_m - Q_tot/Hs.sum()*0.076
+ax2.plot(timestamps, T_w, c='tab:orange', label='Measured T_w')
+ax2.set_ylim(-2, 10)
+ax2.legend()
 
-# ax2.plot(hours, T_b, label='Borehole wall')
-ax2.plot(hours, T_f_in, label='Model inlet')
-ax2.plot(hours, inlet_temps, label='Measured inlet')
-ax2.legend(loc='upper left')
+
+
+
+# # ax2.plot(timestamps, T_b, label='Borehole wall')
+# ax2.plot(timestamps, T_f_in, label='Model inlet')
+# ax2.plot(timestamps, inlet_temps, label='Measured inlet')
+# ax2.legend(loc='upper left')
 
 ax3 = fig.add_subplot(313, sharex = ax1)
 ax3.set_xlabel(r'Time (hours)')
 ax3.set_ylabel(r'Temperature (°C)')
 gt.utilities._format_axes(ax3)
 
-ax3.plot(hours, T_f_out, label='Model outlet')
-ax3.plot(hours, outlet_temps, label='Measured outlet')
+ax3.plot(timestamps, T_f_in, c='tab:blue', lw=1, ls='--', label='Model inlet')
+ax3.plot(timestamps, inlet_temps, c='tab:orange', lw=1, ls='--', label='Measured inlet')
+ax3.plot(timestamps, T_f_out, c='tab:blue', lw=1, ls='-', label='Model outlet')
+ax3.plot(timestamps, outlet_temps, c='tab:orange', lw=1, ls='-', label='Measured outlet')
+ax3.set_ylim(-2, 10)
 ax3.legend(loc='upper left')
 
 # Adjust to plot window
