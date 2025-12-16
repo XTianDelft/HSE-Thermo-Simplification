@@ -19,6 +19,7 @@ Tf_min = 0
 R_max = 30 #Max Radius in m
 H_max = 40 #Max depth in m
 
+#==Done Setting, then Importing==
 
 ground = GroundConstantTemperature(k_g, T_g, Cp)
 
@@ -32,20 +33,41 @@ borefield.ground_data = ground
 borefield.Rb = Rb
 borefield.set_max_avg_fluid_temperature(Tf_max)
 borefield.set_min_avg_fluid_temperature(Tf_min)
+#--------------------Initial Conditions----------------------------END
 
-# custom field with pygfunction
-tilt = np.deg2rad(45)
-H = 30 #Arbitrary Initial Borehole length (in meters)
+
+def fitment(angle,length,max_radius,max_depth):
+    fit = True
+    radangle = np.deg2rad(angle)
+    if np.sin(radangle)*length > max_radius:#radius check
+        fit = False
+        print("Too far horizontally!")
+    elif np.cos(radangle)*length > max_depth:#depth check
+        fit = False
+        print("Too far vertically!")
+    return fit
+
+def calculate(degangle, Nb): # custom field with pygfunction
+
+    tilt = np.deg2rad(degangle)
+    H = 30 #Arbitrary Initial Borehole length (in meters) AUTO
+    B = r_b/np.sin(np.pi/Nb) #Radial Separation of borehole heads AUTO
+    print("Borehole Radial Head Separation(Radius): ",B," [m]")
+
+    boreholes = [gt.boreholes.Borehole(H, 0, r_b, B*np.cos(phi), B*np.sin(phi), tilt=tilt, orientation=phi) for phi in np.linspace(0, 2*np.pi, Nb, endpoint=False)]
+    borefield.set_borefield(gt.borefield.Borefield.from_boreholes(boreholes))
+
+    length = borefield.size(L4_sizing=True) #each borehole length
+    print(f"Each BH is: {length} m")
+
+    return length
+
+
+#-----------------variable Conditions-----------------
 Nb = 9 #Number of Boreholes
-B = r_b/np.sin(np.pi/Nb) #Radial Separation of borehole heads
-print("Borehole Radial Head Separation(Radius): ",B," [m]")
+degangle = 45 #degrees from vertical
 
-boreholes = [gt.boreholes.Borehole(H, 0, r_b, B*np.cos(phi), B*np.sin(phi), tilt=tilt, orientation=phi) for phi in np.linspace(0, 2*np.pi, Nb, endpoint=False)]
-gt_borefield = gt.borefield.Borefield.from_boreholes(boreholes)
 
-borefield.set_borefield(gt_borefield)
-# borefield.create_custom_dataset(options={'method': 'similarities'})
+print ("Length each Results: ", calculate(degangle, Nb))
 
-length = borefield.size(L4_sizing=True) #each borehole length
-print(f"The borehole length (with {Nb} boreholes) is: {length} m")
-print(f"{borefield.limiting_quadrant = }")
+print ("Fitment Results: ", fitment(0,45,R_max,H_max))
