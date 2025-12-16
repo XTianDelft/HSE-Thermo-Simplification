@@ -16,6 +16,10 @@ r_b = 0.125 #Borehole radius
 Tf_max = 16
 Tf_min = 0
 
+#Property Boundaries
+R_max = 30 #Max Radius in m
+H_max = 40 #Max depth in m
+
 
 ground = GroundConstantTemperature(k_g, T_g, Cp)
 
@@ -45,15 +49,18 @@ borefield.set_min_avg_fluid_temperature(Tf_min)
 # custom field with pygfunction
 tilt = np.deg2rad(45)
 H = 30 #Arbitrary Initial Borehole length (in meters)
-B = .2 #Radial Separation of borehole heads
 Nb = 9 #Number of Boreholes
+B = 1#r_b/np.sin(np.pi/Nb) #Radial Separation of borehole heads
+print("Borehole Radial Head Separation(Radius): ",B," [m]")
+
 boreholes = [gt.boreholes.Borehole(H, 0, r_b, B*np.cos(phi), B*np.sin(phi), tilt=tilt, orientation=phi) for phi in np.linspace(0, 2*np.pi, Nb, endpoint=False)]
 gt_borefield = gt.borefield.Borefield.from_boreholes(boreholes)
 
 borefield.set_borefield(gt_borefield)
 # borefield.create_custom_dataset(options={'method': 'similarities'})
 
-length = borefield.size(L4_sizing=True)
+length = borefield.size(L4_sizing=True) #each borehole length
+
 print(f"The borehole length (with {Nb} boreholes) is: {length} m")
 print(f"{borefield.limiting_quadrant = }")
 
