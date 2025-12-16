@@ -1,4 +1,6 @@
+import pickle
 import numpy as np
+import matplotlib.pyplot as plt
 import pygfunction as gt
 from GHEtool import *
 
@@ -14,12 +16,24 @@ r_b = 0.125
 Tf_max = 16
 Tf_min = 0
 
-profile_fn = "profiles/profile-test.xlsx"
 
 ground = GroundConstantTemperature(k_g, T_g, Cp)
 
+profile_fn = "profiles/profile-test.xlsx"
 heat_profile = read_hourly_profile(profile_fn)
 load = HourlyBuildingLoad(heat_profile/1e3)
+
+# with open('./HSE data/outputs/EnergyMeter_outputs.pkl', 'rb') as f:
+#     aggregated_df = pickle.load(f)['aggregated_df']
+# heat_profile_kW = aggregated_df['Power_KW'].to_numpy()[:8760]
+# is_extracting = heat_profile_kW >= 0
+# extraction_load = heat_profile_kW * is_extracting
+# injection_load = -(heat_profile_kW * ~is_extracting)
+# plt.plot(injection_load)
+# plt.show()
+# load = HourlyGeothermalLoad(extraction_load)
+
+
 
 borefield = Borefield(load=load)
 
@@ -31,8 +45,8 @@ borefield.set_min_avg_fluid_temperature(Tf_min)
 # custom field with pygfunction
 tilt = np.deg2rad(45)
 H = 30
-B = 1
-Nb = 5
+B = .2
+Nb = 9
 boreholes = [gt.boreholes.Borehole(H, 0, r_b, B*np.cos(phi), B*np.sin(phi), tilt=tilt, orientation=phi) for phi in np.linspace(0, 2*np.pi, Nb, endpoint=False)]
 gt_borefield = gt.borefield.Borefield.from_boreholes(boreholes)
 
@@ -40,7 +54,7 @@ borefield.set_borefield(gt_borefield)
 # borefield.create_custom_dataset(options={'method': 'similarities'})
 
 length = borefield.size(L4_sizing=True)
-print("The borehole length is: ", length, "m")
+print(f"The borehole length (with {Nb} boreholes) is: {length} m")
 print(f"{borefield.limiting_quadrant = }")
 
 # print imbalance
