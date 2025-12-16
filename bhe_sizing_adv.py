@@ -70,6 +70,9 @@ def calculate(degangle, Nb): # custom field with pygfunction
 angles = list(range(0, 50, 5))  # 0, 5, 10 ... 45
 nb_range = list(range(1, 17))  # 1, 2, 3 ... 16
 
+iterations = len(angles)*len(nb_range)
+iter = 1
+
 # 2. Create the Excel file and setup formatting
 file_name = "Fitment_Results.xlsx"
 writer = pd.ExcelWriter(file_name, engine='xlsxwriter')
@@ -102,6 +105,8 @@ for r_idx, angle in enumerate(angles):
 
         print("Tilt(Deg): ",angle,"// BH#: ",nb)
         print("Results: ", val, " [m] total, Fitment:", is_fit)
+        print("=====Iteration ",iter," out of ",iterations," Complete=====")
+        iter = iter + 1
 
 # 5. Save and Close
 writer.close()
