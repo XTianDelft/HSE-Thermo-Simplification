@@ -10,7 +10,7 @@ T_g = 10     # undisturbed ground temperature
 k_g = 2.8   # ground thermal conductivity
 Cp = 2.8e6  # ground volumetric heat capacity in J/m3K
 Rb = 0.1125
-r_b = 0.125
+r_b = 0.125 #Borehole radius
 
 # min and max fluid temperatures
 Tf_max = 16
@@ -44,9 +44,9 @@ borefield.set_min_avg_fluid_temperature(Tf_min)
 
 # custom field with pygfunction
 tilt = np.deg2rad(45)
-H = 30
-B = .2
-Nb = 9
+H = 30 #Arbitrary Initial Borehole length (in meters)
+B = .2 #Radial Separation of borehole heads
+Nb = 9 #Number of Boreholes
 boreholes = [gt.boreholes.Borehole(H, 0, r_b, B*np.cos(phi), B*np.sin(phi), tilt=tilt, orientation=phi) for phi in np.linspace(0, 2*np.pi, Nb, endpoint=False)]
 gt_borefield = gt.borefield.Borefield.from_boreholes(boreholes)
 
