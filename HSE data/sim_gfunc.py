@@ -31,6 +31,9 @@ alpha = k_s / cp_v
 # alpha = 1e-6
 print(f"α = {alpha:.2e}")
 
+# def COMSOL_annulus_convective_thermal_resistances(m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon):
+
+
 # Borefield dimensions (lengths and directions)
 Hs = np.array([40, 42.4, 32.9, 41.8, 42, 42, 34.95, 43.5, 40])
 Nb = len(Hs)
@@ -111,7 +114,7 @@ rho_f = fluid.rho   # Fluid density
 mu_f = fluid.mu     # Fluid dynamic viscosity (kg/m.s)
 k_f = fluid.k       # Fluid thermal conductivity
 
-flow_rate = 3    # Flow rate in m^3/hour; # TODO: fix this
+flow_rate = 20   # Flow rate in m^3/hour; # TODO: fix this
 m_flow_borehole = flow_rate/3600*rho_f/Nb # Total fluid mass flow rate per borehole (kg/s)
 
 # For the convection and conduction calculations we use the functions from the pygfunction library.
@@ -222,6 +225,20 @@ for i in range(Nt):
     T_f_out[i] = network.get_network_outlet_temperature(
             T_f_in[i],  T_b[i], flow_rate_kgs[i]+0.01, cp_f, nSegments=12)
 
+
+if 0:
+    T_m_measured = (inlet_temps + outlet_temps)/2
+    T_m_model = (T_f_in + T_f_out)/2
+    R_b = (T_m_measured - T_b) * Hs.sum() / -Q_tot
+    plt.plot(timestamps, R_b)
+    # plt.xlim(np.datetime64('2025-01-23', 'ns'), np.datetime64('2025-02-09', 'ns'))
+    plt.xlabel('time')
+    plt.ylabel('EBTR (m.K/W)')
+    plt.ylim(0, 0.3)
+    plt.tight_layout()
+    plt.savefig('calc_EBTR.png', dpi=360)
+    plt.show()
+
 # Configure figure and axes
 fig = gt.utilities._initialize_figure()
 fig.set_size_inches(8, 10)
@@ -237,17 +254,23 @@ plt.setp(plt.gca().get_xticklabels(), visible=False)
 Q_calc = flow_rate_kgs * cp_f * (T_f_out - T_f_in)
 plt.scatter(timestamps, Q_calc, c='blue', s=1, label='model heat extraction')
 plt.scatter(timestamps, Q_tot, c='red', s=1, label='heat extraction')
+plt.xlim(np.datetime64('2025-01-23', 'ns'), np.datetime64('2025-02-09', 'ns'))
 plt.legend(loc='upper left')
+
 
 ax2 = fig.add_subplot(312, sharex = ax1)
 plt.sca(ax2)
-plt.ylabel(r'Temps (°C)')
+plt.ylabel(r'Calculated $R_b$ (m.K/W)')
 gt.utilities._format_axes(plt.gca())
 plt.setp(plt.gca().get_xticklabels(), visible=False)
-plt.plot(timestamps, (T_f_in + T_f_out)/2, c='tab:blue', label='Model T_m')
-T_m = (inlet_temps + outlet_temps)/2
-plt.plot(timestamps, T_m, c='tab:orange', label='Measured T_m')
-plt.ylim(-2, 10)
+T_m_model = (T_f_in + T_f_out)/2
+T_m_measured = (inlet_temps + outlet_temps)/2
+# T_b_model = T_b
+# R_b_model =
+plt.plot(timestamps, T_m_model, c='tab:blue', label='Model T_m')
+plt.plot(timestamps, T_m_measured, c='tab:orange', label='Measured T_m')
+# plt.ylim(-2, 10)
+plt.ylim(2, 8)
 plt.legend()
 
 
@@ -267,7 +290,6 @@ plt.plot(timestamps, T_f_in, c='tab:blue', lw=1, ls='--', label='Model inlet')
 plt.plot(timestamps, inlet_temps, c='tab:orange', lw=1, ls='--', label='Measured inlet')
 plt.plot(timestamps, T_f_out, c='tab:blue', lw=1, ls='-', label='Model outlet')
 plt.plot(timestamps, outlet_temps, c='tab:orange', lw=1, ls='-', label='Measured outlet')
-plt.ylim(-2, 10)
 plt.legend(loc='upper left')
 
 # Adjust to plot window
