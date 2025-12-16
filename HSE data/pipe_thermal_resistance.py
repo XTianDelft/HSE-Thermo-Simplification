@@ -55,13 +55,18 @@ def R_b_pyg(m_flow_borehole):
             m_flow_borehole, r_in_in, mu_f, rho_f, k_f, cp_f, epsilon)
     R_in_conv = 1 / (h_f_in * 2 * np.pi * r_in_in)
 
+    r_star = r_mid_out / r_out_in
     h_f_ann_inner, h_f_ann_outer = gt.pipes.convective_heat_transfer_coefficient_concentric_annulus(
                 m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon)
+    D_h = 2 * (r_out_in - r_mid_out)
+    Nu_a_in = h_f_ann_inner * D_h / k_f
+    Nu_a_out = h_f_ann_outer * D_h / k_f
+
     R_ann_out_conv = 1 / (h_f_ann_outer * 2 * np.pi * r_out_in)
     R_ann_in_conv = 1 / (h_f_ann_inner * 2 * np.pi * r_mid_out)
 
     R_ff = R_in_conv + R_in_pipe + R_mid_gap + R_mid_pipe + R_ann_in_conv
-    R_fp = R_out_pipe + R_ann_out_conv
+    R_fp = R_ann_out_conv + R_out_pipe
 
     # print(f'{h_f_in = :.3f} {h_f_ann_inner = :.3f} {h_f_ann_outer = :.3f}')
     # print(f'{R_ff = :.3f}, {R_fp = :.3f}, {R_out_pipe = :.3f}, {R_grout = :.3f}, ')
@@ -154,6 +159,13 @@ def R_b_comsol(m_flow_borehole, T_f=3.5+273.15):
     R_in_conv = 1/(h_in*pi*DI_in)
     R_ann_inner_conv = 1/(h_ann*pi*DO_mid)
     R_ann_outer_conv = 1/(h_ann*pi*DI_out)
+
+    # h_ann_inner_conv, h_ann_outer_conv = gt.pipes.convective_heat_transfer_coefficient_concentric_annulus(
+    #             m_flow_borehole, DO_mid/2, DI_out/2, mu_f, rho_f, k_f, cp_f, 1.0e-6)
+    # R_ann_inner_conv = 1 / (h_ann_inner_conv * np.pi * DO_mid)
+    # R_ann_outer_conv = 1 / (h_ann_outer_conv * np.pi * DI_out)
+
+
     R_ann_path = R_ann_outer_conv
     R_inner_path = R_in_conv + R_in_pipe + R_mid_gap + R_mid_pipe + R_ann_inner_conv
     R_b = (1/(1/R_inner_path + 1/R_ann_path)) + R_outer_pipe + R_grout
@@ -167,12 +179,16 @@ m_flow_values = np.linspace(0.01, 1, 1000)
 pyg_thermal_resistances = R_b_pyg_vec(m_flow_values)
 plt.plot(m_flow_values, pyg_thermal_resistances, label='pygfunction')
 
+# plt.plot(m_flow_values, pyg_thermal_resistances[0], label='pygfunction 1')
+# plt.plot(m_flow_values, pyg_thermal_resistances[1], label='pygfunction 2')
+
+
 for T in [2, 5, 8]:
     comsol_thermal_resistances = R_b_comsol_vec(m_flow_values, T+273.15)
     plt.plot(m_flow_values, comsol_thermal_resistances, label=f'COMSOL T = {T} °C')
 
 plt.xlim(0, m_flow_values.max())
-plt.ylim(0, 0.5)
+plt.ylim(0, .3)
 plt.minorticks_on()
 plt.grid(which='major', color='gray')
 plt.grid(which='minor', color='lightgray')

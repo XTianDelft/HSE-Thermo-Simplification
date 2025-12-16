@@ -51,7 +51,7 @@ tilt = np.deg2rad(45)
 H = 30 #Arbitrary Initial Borehole length (in meters)
 Nb = 9 #Number of Boreholes
 B = r_b/np.sin(np.pi/Nb) #Radial Separation of borehole heads
-print("Borehole Radial Head Separation(Radius): ",B," [m]")
+# print("Borehole Radial Head Separation(Radius): ",B," [m]")
 
 boreholes = [gt.boreholes.Borehole(H, 0, r_b, B*np.cos(phi), B*np.sin(phi), tilt=tilt, orientation=phi) for phi in np.linspace(0, 2*np.pi, Nb, endpoint=False)]
 gt_borefield = gt.borefield.Borefield.from_boreholes(boreholes)
@@ -60,23 +60,20 @@ borefield.set_borefield(gt_borefield)
 # borefield.create_custom_dataset(options={'method': 'similarities'})
 
 length = borefield.size(L4_sizing=True) #each borehole length
+depth = length * np.cos(tilt)
+tip_radius = B + length * np.sin(tilt)
 
-print(f"The borehole length (with {Nb} boreholes) is: {length} m")
+print("\n\nThe chosen layout:")
+print(f"A ring of {Nb} boreholes (r={B:.2f} m), of length: {length:.1f} m (depth: {depth:.2f} m, bh tip radius: {tip_radius:.2f}) at an angle of {np.rad2deg(tilt):.2f}°")
+print("\n")
 print(f"{borefield.limiting_quadrant = }")
 
 # print imbalance
-print("The borefield imbalance is: ", borefield.load.imbalance,
-        "kWh/y. (A negative imbalance means the the field is heat extraction dominated so it cools down year after year.)")  # print imbalance
+print(f"The borefield imbalance is: {borefield.load.imbalance:.0f} kWh/y. (A negative imbalance means the the field is heat extraction dominated so it cools down year after year.)")  # print imbalance
 
 Tf = borefield.results.Tf
 
 # plot temperature profile for the calculated borehole length
-borefield.print_temperature_profile(legend=True, plot_hourly=True)
-
-# plot temperature profile for a fixed borehole length
-# borefield.print_temperature_profile_fixed_length(length=75, legend=False)
-
-# print gives the array of monthly temperatures for peak cooling without showing the plot
-borefield.calculate_temperatures(length=90)
-# print("Result array for cooling peaks")
-# print(borefield.results.peak_injection)
+plot_temp = False
+if plot_temp:
+    borefield.print_temperature_profile(legend=True, plot_hourly=True)
