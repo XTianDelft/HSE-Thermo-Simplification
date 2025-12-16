@@ -72,7 +72,7 @@ def R_b_pyg(m_flow_borehole):
     R_b = pipe.effective_borehole_thermal_resistance(
         m_flow_borehole, fluid.cp)
 
-    return h_f_ann_inner
+    return R_b
 R_b_pyg_vec = np.vectorize(R_b_pyg)
 
 def R_b_comsol(m_flow_borehole, T_f=3.5+273.15):
@@ -122,8 +122,8 @@ def R_b_comsol(m_flow_borehole, T_f=3.5+273.15):
     R_mid_pipe = log(DO_mid/DI_mid)/(2*pi*k_mid)			#  0.082459 s³·K/(kg·m) # Conduction through the mid-pipe wall
     R_outer_pipe = log(DO_out/DI_out)/(2*pi*k_pipe)			#  0.026595 s³·K/(kg·m) # Outer pipe wall conduction
     z_top = 0			# [m] 0 m # top surface at z=0; soil goes downward
-    x_loc = 0.7			# [m] 0.7 m # 
-    y_loc = 0.7			# [m] 0.7 m # 
+    x_loc = 0.7			# [m] 0.7 m #
+    y_loc = 0.7			# [m] 0.7 m #
     L_Grout = 41			# [m] 41 m # Grout length
     x_loc_1 = .7			# [m] 0.7 m # Loc for new pipes
     y_loc_1 = .7			# [m] 0.7 m # Loc for new pipes
@@ -158,7 +158,7 @@ def R_b_comsol(m_flow_borehole, T_f=3.5+273.15):
     R_inner_path = R_in_conv + R_in_pipe + R_mid_gap + R_mid_pipe + R_ann_inner_conv
     R_b = (1/(1/R_inner_path + 1/R_ann_path)) + R_outer_pipe + R_grout
 
-    return h_ann
+    return R_b
 R_b_comsol_vec = np.vectorize(R_b_comsol)
 
 
