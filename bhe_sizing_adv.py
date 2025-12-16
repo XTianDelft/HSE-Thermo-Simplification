@@ -92,7 +92,7 @@ worksheet.write(0, 0, 'Angle \ Nb')
 for r_idx, angle in enumerate(angles):
     for c_idx, nb in enumerate(nb_range):
         # Use your functions
-        val,is_fit = calculate(angle,nb)
+        val, is_fit = calculate(angle,nb)
 
         # Choose format based on fitment
         cell_fmt = green_fmt if is_fit else red_fmt
@@ -101,6 +101,7 @@ for r_idx, angle in enumerate(angles):
         worksheet.write(r_idx + 1, c_idx + 1, val, cell_fmt)
 
         print("Tilt(Deg): ",angle,"// BH#: ",nb)
+        print("Results: ", val, " [m] total, Fitment:", is_fit)
 
 # 5. Save and Close
 writer.close()
