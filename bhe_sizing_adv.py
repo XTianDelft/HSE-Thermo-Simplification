@@ -1,8 +1,11 @@
 import pandas as pd
 import pygfunction as gt
 from GHEtool import *
+import time
 
 from heat_profile import *
+
+starttime = time.time()
 
 #--------------------Initial Conditions----------------------------
 T_g = 10     # undisturbed ground temperature
@@ -67,7 +70,7 @@ def calculate(degangle, Nb): # custom field with pygfunction
 # ---------------------------------!!!AI Code for Excel Output BELOW!!!---------------------------------------
 
 # 1. Define your axes
-angles = list(range(0, 50, 5))  # 0, 5, 10 ... 45
+angles = list(range(0, 70, 5))  # 0, 5, 10 ... 45
 nb_range = list(range(1, 17))  # 1, 2, 3 ... 16
 
 iterations = len(angles)*len(nb_range)
@@ -104,10 +107,11 @@ for r_idx, angle in enumerate(angles):
         worksheet.write(r_idx + 1, c_idx + 1, val, cell_fmt)
 
         print("Tilt(Deg): ",angle,"// BH#: ",nb)
-        print("Results: ", val, " [m] total, Fitment:", is_fit)
-        print("=====Iteration ",iter," out of ",iterations," Complete=====")
+        print(f"Results: {val:.2f} [m] total, Fitment:", is_fit)
+        time_remaining = (time.time() - starttime)/iter*(iterations-iter)
+        print(f"==========Iteration {iter} out of {iterations} Complete at {time.time() - starttime:.1f} seconds ///// Estimated Completion in {time_remaining:.1f} seconds==========")
         iter = iter + 1
 
 # 5. Save and Close
 writer.close()
-print(f"Success! Excel sheet '{file_name}' has been created.")
+print(f"Success! Excel sheet '{file_name}' has been created. Total time: {time.time()-starttime:.2f} seconds")
