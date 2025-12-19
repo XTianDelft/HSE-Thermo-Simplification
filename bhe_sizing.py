@@ -23,9 +23,21 @@ H_max = 40 #Max depth in m
 
 ground = GroundConstantTemperature(k_g, T_g, Cp)
 
-profile_fn = "profiles/profile-test.xlsx"
-heat_profile = read_hourly_profile(profile_fn)
-load = HourlyBuildingLoad(heat_profile/1e3)
+# profile_fn = "profiles/profile-test.xlsx"
+profiles_filenames = [
+    "profiles/profile-corner.xlsx",
+    "profiles/profile-corner.xlsx",
+    "profiles/profile-mid.xlsx",
+    "profiles/profile-mid.xlsx"
+]
+
+total_heat_profile = np.zeros(8760, dtype=np.float64)
+for profile_fn in profiles_filenames:
+    heat_profile = read_hourly_profile(profile_fn)
+    assert len(heat_profile) == 8760, f"heat profile in file {profile_fn} has {len(heat_profile)} hours"
+    total_heat_profile += heat_profile
+
+load = HourlyBuildingLoad(total_heat_profile/1e3)
 
 # with open('./HSE data/outputs/EnergyMeter_outputs.pkl', 'rb') as f:
 #     aggregated_df = pickle.load(f)['aggregated_df']
@@ -49,7 +61,7 @@ borefield.set_min_avg_fluid_temperature(Tf_min)
 # custom field with pygfunction
 tilt = np.deg2rad(45)
 H = 30 #Arbitrary Initial Borehole length (in meters)
-Nb = 9 #Number of Boreholes
+Nb = 4 #Number of Boreholes
 B = r_b/np.sin(np.pi/Nb) #Radial Separation of borehole heads
 # print("Borehole Radial Head Separation(Radius): ",B," [m]")
 

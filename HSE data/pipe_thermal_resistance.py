@@ -2,8 +2,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pygfunction as gt
 
+def COMSOL_convective_thermal_resistances(m_flow_borehole, cross_sect_area, hydraulic_diameter, L_char, mu_f, rho_f, k_f, cp_f):
+    Pr = cp_f*mu_f/k_f
 
-def R_b_pyg(m_flow_borehole):
+    # Q_leg = m_flow_borehole/rho_f
+    # v = Q_leg/cross_sect_area
+    # Re = rho_f*v*hydraulic_diameter/mu_f
+
+    Re = hydraulic_diameter*m_flow_borehole/(cross_sect_area*mu_f)
+
+    Nu = (3.66 + (0.0668*(hydraulic_diameter/L_char)*Re*Pr)/(1+0.04*((hydraulic_diameter/L_char)*Re * Pr)**(2/3))) if Re < 2300 else (0.023*Re**(0.8)*Pr**(0.4))
+
+    h = Nu*k_f/hydraulic_diameter
+    return h
+
+def R_b_pyg(m_flow_borehole, T=3):
     k_s = 1.2     # Soil thermal conductivity
 
     # Borehole dimensions
@@ -30,7 +43,7 @@ def R_b_pyg(m_flow_borehole):
 
     # Fluid properties; NOTE: these are different from the values used in COMSOL
     # https://pygfunction.readthedocs.io/en/stable/modules/media.html
-    fluid = gt.media.Fluid('MEG', 14) # 14% ethylene glycol in water at T=20°C
+    fluid = gt.media.Fluid('MEG', 14, T=T) # 14% ethylene glycol in water at T=20°C
     cp_f = fluid.cp     # Fluid specific isobaric heat capacity
     rho_f = fluid.rho   # Fluid density
     mu_f = fluid.mu     # Fluid dynamic viscosity (kg/m.s)
@@ -51,16 +64,28 @@ def R_b_pyg(m_flow_borehole):
     R_grout = gt.pipes.conduction_thermal_resistance_circular_pipe(r_out_out, r_b, k_g)
 
         # Fluid convection thermal resistances
-    h_f_in = gt.pipes.convective_heat_transfer_coefficient_circular_pipe(
-            m_flow_borehole, r_in_in, mu_f, rho_f, k_f, cp_f, epsilon)
+    # h_f_in = gt.pipes.convective_heat_transfer_coefficient_circular_pipe(
+    #         m_flow_borehole, r_in_in, mu_f, rho_f, k_f, cp_f, epsilon)
+    # R_in_conv = 1 / (h_f_in * 2 * np.pi * r_in_in)
+
+    # h_f_ann_inner, h_f_ann_outer = gt.pipes.convective_heat_transfer_coefficient_concentric_annulus(
+    #             m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon)
+    # D_h = 2 * (r_out_in - r_mid_out)
+
+    # Nu_a_in = h_f_ann_inner * D_h / k_f
+    # Nu_a_out = h_f_ann_outer * D_h / k_f
+
+    Nseg = 10
+    L_char = 50/Nseg
+    h_f_in = COMSOL_convective_thermal_resistances(m_flow_borehole, np.pi*r_in_in**2, r_in_in*2, L_char, mu_f, rho_f, k_f, cp_f)
     R_in_conv = 1 / (h_f_in * 2 * np.pi * r_in_in)
 
-    r_star = r_mid_out / r_out_in
-    h_f_ann_inner, h_f_ann_outer = gt.pipes.convective_heat_transfer_coefficient_concentric_annulus(
-                m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon)
-    D_h = 2 * (r_out_in - r_mid_out)
-    Nu_a_in = h_f_ann_inner * D_h / k_f
-    Nu_a_out = h_f_ann_outer * D_h / k_f
+    # h_f_ann_inner, h_f_ann_outer = gt.pipes.convective_heat_transfer_coefficient_concentric_annulus(
+    #             m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon)
+    A_ann = np.pi * (r_out_in**2 - r_mid_out**2)
+    Dh_ann = 2*(r_out_in - r_mid_out)
+    h_f_ann_inner = COMSOL_convective_thermal_resistances(m_flow_borehole, A_ann, Dh_ann, L_char, mu_f, rho_f, k_f, cp_f)
+    h_f_ann_outer = COMSOL_convective_thermal_resistances(m_flow_borehole, A_ann, Dh_ann, L_char, mu_f, rho_f, k_f, cp_f)
 
     R_ann_out_conv = 1 / (h_f_ann_outer * 2 * np.pi * r_out_in)
     R_ann_in_conv = 1 / (h_f_ann_inner * 2 * np.pi * r_mid_out)
@@ -80,7 +105,7 @@ def R_b_pyg(m_flow_borehole):
     return R_b
 R_b_pyg_vec = np.vectorize(R_b_pyg)
 
-def R_b_comsol(m_flow_borehole, T_f=3.5+273.15):
+def R_b_comsol(m_flow_borehole, T_f=3+273.15, Nseg = 10):
     pi = np.pi
     log = np.log # natural logarithm
     if_ = lambda cond, expr1, expr2: expr1 if cond else expr2
@@ -142,7 +167,7 @@ def R_b_comsol(m_flow_borehole, T_f=3.5+273.15):
 
     # L = 40			# [m] 40 m # BH1 length
     L = 50
-    Nseg = 10			#  10  # BH1: Number of segments
+    # Nseg = 10			#  10  # BH1: Number of segments
     dz = L/Nseg			#  4 m # BH1: Segment length
     on = 1			#  1  # 1: on/ 0: off
     L_char = dz			#  4 m # set L_char = dz_BHX if you prefer
@@ -183,9 +208,9 @@ plt.plot(m_flow_values, pyg_thermal_resistances, label='pygfunction')
 # plt.plot(m_flow_values, pyg_thermal_resistances[1], label='pygfunction 2')
 
 
-for T in [2, 5, 8]:
-    comsol_thermal_resistances = R_b_comsol_vec(m_flow_values, T+273.15)
-    plt.plot(m_flow_values, comsol_thermal_resistances, label=f'COMSOL T = {T} °C')
+for Nseg in [10]:
+    comsol_thermal_resistances = R_b_comsol_vec(m_flow_values, 3+273.15, Nseg)
+    plt.plot(m_flow_values, comsol_thermal_resistances, label=f'COMSOL Nseg = {Nseg}')#label=f'COMSOL T = {T} °C')
 
 plt.xlim(0, m_flow_values.max())
 plt.ylim(0, .3)

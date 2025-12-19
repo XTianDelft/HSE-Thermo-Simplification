@@ -31,8 +31,19 @@ alpha = k_s / cp_v
 # alpha = 1e-6
 print(f"α = {alpha:.2e}")
 
-# def COMSOL_annulus_convective_thermal_resistances(m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon):
+def COMSOL_convective_thermal_resistances(m_flow_borehole, cross_sect_area, hydraulic_diameter, L_char, mu_f, rho_f, k_f, cp_f):
+    Pr = cp_f*mu_f/k_f
 
+    # Q_leg = m_flow_borehole/rho_f
+    # v = Q_leg/cross_sect_area
+    # Re = rho_f*v*hydraulic_diameter/mu_f
+
+    Re = hydraulic_diameter*m_flow_borehole/(cross_sect_area*mu_f)
+
+    Nu = (3.66 + (0.0668*(hydraulic_diameter/L_char)*Re*Pr)/(1+0.04*((hydraulic_diameter/L_char)*Re * Pr)**(2/3))) if Re < 2300 else (0.023*Re**(0.8)*Pr**(0.4))
+
+    h = Nu*k_f/hydraulic_diameter
+    return h
 
 # Borefield dimensions (lengths and directions)
 Hs = np.array([40, 42.4, 32.9, 41.8, 42, 42, 34.95, 43.5, 40])
@@ -114,7 +125,7 @@ rho_f = fluid.rho   # Fluid density
 mu_f = fluid.mu     # Fluid dynamic viscosity (kg/m.s)
 k_f = fluid.k       # Fluid thermal conductivity
 
-flow_rate = 20   # Flow rate in m^3/hour; # TODO: fix this
+flow_rate = 3   # Flow rate in m^3/hour; # TODO: fix this
 m_flow_borehole = flow_rate/3600*rho_f/Nb # Total fluid mass flow rate per borehole (kg/s)
 
 # For the convection and conduction calculations we use the functions from the pygfunction library.
@@ -129,17 +140,25 @@ R_out_pipe = gt.pipes.conduction_thermal_resistance_circular_pipe(r_out_in, r_ou
 R_grout = gt.pipes.conduction_thermal_resistance_circular_pipe(r_out_out, r_b, k_g)
 
 # Fluid convection thermal resistances
-h_f_in = gt.pipes.convective_heat_transfer_coefficient_circular_pipe(
-        m_flow_borehole, r_in_in, mu_f, rho_f, k_f, cp_f, epsilon)
+# h_f_in = gt.pipes.convective_heat_transfer_coefficient_circular_pipe(
+#         m_flow_borehole, r_in_in, mu_f, rho_f, k_f, cp_f, epsilon)
+Nseg = 10
+L_char = H_mean/Nseg
+h_f_in = COMSOL_convective_thermal_resistances(m_flow_borehole, np.pi*r_in_in**2, r_in_in*2, L_char, mu_f, rho_f, k_f, cp_f)
 R_in_conv = 1 / (h_f_in * 2 * np.pi * r_in_in)
 
-h_f_ann_inner, h_f_ann_outer = gt.pipes.convective_heat_transfer_coefficient_concentric_annulus(
-            m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon)
+# h_f_ann_inner, h_f_ann_outer = gt.pipes.convective_heat_transfer_coefficient_concentric_annulus(
+#             m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon)
+A_ann = np.pi * (r_out_in**2 - r_mid_out**2)
+Dh_ann = 2*(r_out_in - r_mid_out)
+h_f_ann_inner = COMSOL_convective_thermal_resistances(m_flow_borehole, A_ann, Dh_ann, L_char, mu_f, rho_f, k_f, cp_f)
+h_f_ann_outer = COMSOL_convective_thermal_resistances(m_flow_borehole, A_ann, Dh_ann, L_char, mu_f, rho_f, k_f, cp_f)
 R_ann_out_conv = 1 / (h_f_ann_outer * 2 * np.pi * r_out_in)
 R_ann_in_conv = 1 / (h_f_ann_inner * 2 * np.pi * r_mid_out)
 
 R_ff = R_in_conv + R_in_pipe + R_mid_gap + R_mid_pipe + R_ann_in_conv
-R_fp = R_out_pipe + R_ann_out_conv
+# R_fp = R_out_pipe + R_ann_out_conv
+R_fp = .11 - np.log(r_b/r_out_out)/(2*np.pi*k_g)
 
 print(f'{h_f_in = :.3f} {h_f_ann_inner = :.3f} {h_f_ann_outer = :.3f}')
 print(f'{R_ff = :.3f}, {R_fp = :.3f}, {R_out_pipe = :.3f}, {R_grout = :.3f}, ')
