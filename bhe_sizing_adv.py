@@ -1,4 +1,5 @@
-import pandas as pd
+import pickle
+from multiprocessing import Pool
 import pygfunction as gt
 from GHEtool import *
 import time
@@ -16,32 +17,21 @@ r_b = 0.125 #Borehole radius
 # min and max fluid temperatures
 Tf_max = 16
 Tf_min = 0
-#===Property Boundaries===
-R_max = 30 #Max Radius in m
-H_max = 40 #Max depth in m
 
 #==Done Setting, then Importing==
-borefield = Borefield(load=HourlyBuildingLoad(read_hourly_profile("profiles/profile-test.xlsx")/1e3))
+
+profile_filename = 'profile-test.xlsx'
+heating_load = read_hourly_profile('profiles/' + profile_filename)/1e3
+load = HourlyBuildingLoad(heating_load)
+borefield = Borefield(load=load)
+borefield.THRESHOLD_WARNING_SHALLOW_FIELD = 10
 borefield.ground_data = GroundConstantTemperature(k_g, T_g, Cp)
 borefield.Rb = Rb
 borefield.set_max_avg_fluid_temperature(Tf_max)
 borefield.set_min_avg_fluid_temperature(Tf_min)
 #--------------------Initial Conditions----------------------------END
-def fitment(angle,length,max_radius,max_depth):#check if the borehole fits in the preset cylindrcal volume
-    fit = True
-    radangle = np.deg2rad(angle)
-    if np.sin(radangle)*length+r_b > max_radius:#radius check
-        fit = False
-        print("Too far horizontally!")
-    elif np.cos(radangle)*length > max_depth:#depth check
-        fit = False
-        print("Too far vertically!")
-    else:
-        print("It fits!")
-    return fit
 
-def calculate(degangle, Nb): # custom field with pygfunction
-
+def size_bh_ring(degangle, Nb): # custom field with pygfunction
     tilt = np.deg2rad(degangle)
     H = 30 #Arbitrary Initial Borehole length (in meters) !!AUTO!!
     B = r_b/np.sin(np.pi/Nb) #Radial Separation of borehole heads !!AUTO!!
@@ -54,7 +44,7 @@ def calculate(degangle, Nb): # custom field with pygfunction
     #print(f"Each BH is: {length} m")
     length_total = length*Nb
 
-    return length_total,fitment(degangle,length,R_max,H_max)
+    return length_total #check_constrains(degangle,length,R_max,H_max)
 
 
 #-----------------variable Conditions-----------------ONLY FOR DEBUGGING
@@ -67,51 +57,33 @@ def calculate(degangle, Nb): # custom field with pygfunction
 #degangle = 45 #degrees from vertical
 #print ("Results[Length total BH, Fitment]: ", calculate(degangle, Nb))
 
-# ---------------------------------!!!AI Code for Excel Output BELOW!!!---------------------------------------
 
-# 1. Define your axes
-angles = list(range(0, 70, 5))  # 0, 5, 10 ... 45
-nb_range = list(range(1, 17))  # 1, 2, 3 ... 16
+angles = np.arange(0, 45+1, 1)
+nb_range = np.arange(1, 16+1)
+nr_inputs = len(angles)*len(nb_range)
 
-iterations = len(angles)*len(nb_range)
-iter = 1
+inputs = np.array(np.meshgrid(angles, nb_range)).T.reshape(nr_inputs, 2)
 
-# 2. Create the Excel file and setup formatting
-file_name = "Fitment_Results.xlsx"
-writer = pd.ExcelWriter(file_name, engine='xlsxwriter')
+def do_sizing(inputs):
+    degangle, Nb = inputs
+    print(f'sizing {Nb} boreholes, {degangle}° tilted')
+    return size_bh_ring(degangle, Nb)
 
-# Create a dummy dataframe to initialize the sheet structure
-df = pd.DataFrame(index=angles, columns=nb_range)
-df.to_excel(writer, sheet_name='Data')
+with Pool(12) as p:
+    outputs = p.map(do_sizing, inputs)
 
-workbook = writer.book
-worksheet = writer.sheets['Data']
+outputs = np.array(outputs)
+lengths = outputs.reshape((len(angles), len(nb_range)))
 
-# Define the colors
-green_fmt = workbook.add_format({'bg_color': '#C6EFCE', 'font_color': '#006100', 'border': 1})
-red_fmt = workbook.add_format({'bg_color': '#FFC7CE', 'font_color': '#9C0006', 'border': 1})
+print(lengths)
 
-# 3. Label the Axes
-worksheet.write(0, 0, 'Angle \ Nb')
+saved_dict = {
+    'angles': angles,
+    'nb_range': nb_range,
+    'lengths': lengths
+}
 
-# 4. Loop through the grid and fill cells
-for r_idx, angle in enumerate(angles):
-    for c_idx, nb in enumerate(nb_range):
-        # Use your functions
-        val, is_fit = calculate(angle,nb)
-
-        # Choose format based on fitment
-        cell_fmt = green_fmt if is_fit else red_fmt
-
-        # Write to Excel (r_idx+1/c_idx+1 to skip the headers)
-        worksheet.write(r_idx + 1, c_idx + 1, val, cell_fmt)
-
-        print("Tilt(Deg): ",angle,"// BH#: ",nb)
-        print(f"Results: {val:.2f} [m] total, Fitment:", is_fit)
-        time_remaining = (time.time() - starttime)/iter*(iterations-iter)
-        print(f"==========Iteration {iter} out of {iterations} Complete at {time.time() - starttime:.1f} seconds ///// Estimated Completion in {time_remaining:.1f} seconds==========")
-        iter = iter + 1
-
-# 5. Save and Close
-writer.close()
-print(f"Success! Excel sheet '{file_name}' has been created. Total time: {time.time()-starttime:.2f} seconds")
+results_filename = f"results/results-{profile_filename.split('.')[0]}.pkl"
+print(f'writing results to {results_filename}')
+with open(results_filename, "wb") as f_out:
+    pickle.dump(saved_dict, f_out)
