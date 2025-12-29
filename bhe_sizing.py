@@ -16,27 +16,51 @@ r_b = 0.125 #Borehole radius
 Tf_max = 16
 Tf_min = 0
 
-#Property Boundaries
-R_max = 30 #Max Radius in m
-H_max = 40 #Max depth in m
+# custom field with pygfunction
+tilt = np.deg2rad(45)
+H = 30 #Arbitrary Initial Borehole length (in meters)
+Nb = 20 #Number of Boreholes
+B = r_b/np.sin(np.pi/Nb) #Radial Separation of borehole heads
+# print("Borehole Radial Head Separation(Radius): ",B," [m]")
 
 
 ground = GroundConstantTemperature(k_g, T_g, Cp)
 
-# profile_fn = "profiles/profile-test.xlsx"
+# file_root = 'profiles/'
+file_root = 'profiles/kennemerland/'
 profiles_filenames = [
-    "profiles/profile-corner.xlsx",
-    "profiles/profile-corner.xlsx",
-    "profiles/profile-mid.xlsx",
-    "profiles/profile-mid.xlsx"
+    # 'profile-test.xlsx',
+    # 'profile-test2.xlsx',
+    # 'profile-test3.xlsx',
+    # 'profile-test-capped.xlsx',
+
+    # '46.xlsx',
+    # '44.xlsx',
+
+    # '42.xlsx',
+    # '40.xlsx',
+
+    # '38.xlsx',
+    # '36.xlsx',
+
+    '34.xlsx',
+    '32.xlsx',
+    '30.xlsx',
+    '28.xlsx',
+    '26.xlsx',
+    '24.xlsx',
+
 ]
 
 total_heat_profile = np.zeros(8760, dtype=np.float64)
+print('Summing profiles:')
 for profile_fn in profiles_filenames:
-    heat_profile = read_hourly_profile(profile_fn)
-    assert len(heat_profile) == 8760, f"heat profile in file {profile_fn} has {len(heat_profile)} hours"
+    heat_profile = read_hourly_profile(file_root + profile_fn)
+    print(f'\t{profile_fn.split("/")[-1]}\tenergy: {heat_profile.sum() / 1e6:.1f} MWh, max: {heat_profile.max() / 1e3:.1f} kW')
+    assert len(heat_profile) == 8760, f'heat profile in file {profile_fn} has {len(heat_profile)} hours'
     total_heat_profile += heat_profile
 
+print(f'total heat energy: {total_heat_profile.sum() / 1e6 :.1f} MWh')
 load = HourlyBuildingLoad(total_heat_profile/1e3)
 
 # with open('./HSE data/outputs/EnergyMeter_outputs.pkl', 'rb') as f:
@@ -53,17 +77,11 @@ load = HourlyBuildingLoad(total_heat_profile/1e3)
 
 borefield = Borefield(load=load)
 
+borefield.THRESHOLD_WARNING_SHALLOW_FIELD = 10
 borefield.ground_data = ground
 borefield.Rb = Rb
 borefield.set_max_avg_fluid_temperature(Tf_max)
 borefield.set_min_avg_fluid_temperature(Tf_min)
-
-# custom field with pygfunction
-tilt = np.deg2rad(45)
-H = 30 #Arbitrary Initial Borehole length (in meters)
-Nb = 4 #Number of Boreholes
-B = r_b/np.sin(np.pi/Nb) #Radial Separation of borehole heads
-# print("Borehole Radial Head Separation(Radius): ",B," [m]")
 
 boreholes = [gt.boreholes.Borehole(H, 0, r_b, B*np.cos(phi), B*np.sin(phi), tilt=tilt, orientation=phi) for phi in np.linspace(0, 2*np.pi, Nb, endpoint=False)]
 gt_borefield = gt.borefield.Borefield.from_boreholes(boreholes)
