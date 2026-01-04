@@ -12,44 +12,33 @@ Cp = 2.8e6  # ground volumetric heat capacity in J/m3K
 Rb = 0.1125
 r_b = 0.125 #Borehole radius
 
+alpha = k_g/Cp
+
 # min and max fluid temperatures
 Tf_max = 16
 Tf_min = 0
 
 # custom field with pygfunction
-tilt = np.deg2rad(45)
-H = 30 #Arbitrary Initial Borehole length (in meters)
-Nb = 20 #Number of Boreholes
-B = r_b/np.sin(np.pi/Nb) #Radial Separation of borehole heads
+tilt = np.deg2rad(13)
+H = 40 #Arbitrary Initial Borehole length (in meters)
+Nb = 8 #Number of Boreholes
+B = r_b/np.sin(np.pi/Nb)+.1 #Radial Separation of borehole heads
 # print("Borehole Radial Head Separation(Radius): ",B," [m]")
 
 
 ground = GroundConstantTemperature(k_g, T_g, Cp)
 
 # file_root = 'profiles/'
-file_root = 'profiles/kennemerland/'
+file_root = 'profiles/tuinzicht/'
 profiles_filenames = [
     # 'profile-test.xlsx',
     # 'profile-test2.xlsx',
     # 'profile-test3.xlsx',
     # 'profile-test-capped.xlsx',
 
-    # '46.xlsx',
-    # '44.xlsx',
-
-    # '42.xlsx',
-    # '40.xlsx',
-
-    # '38.xlsx',
-    # '36.xlsx',
-
-    '34.xlsx',
-    '32.xlsx',
-    '30.xlsx',
-    '28.xlsx',
-    '26.xlsx',
-    '24.xlsx',
-
+    '71.xlsx',
+    # '69.xlsx',
+    # '67.xlsx',
 ]
 
 total_heat_profile = np.zeros(8760, dtype=np.float64)
@@ -83,18 +72,29 @@ borefield.Rb = Rb
 borefield.set_max_avg_fluid_temperature(Tf_max)
 borefield.set_min_avg_fluid_temperature(Tf_min)
 
-boreholes = [gt.boreholes.Borehole(H, 0, r_b, B*np.cos(phi), B*np.sin(phi), tilt=tilt, orientation=phi) for phi in np.linspace(0, 2*np.pi, Nb, endpoint=False)]
-gt_borefield = gt.borefield.Borefield.from_boreholes(boreholes)
+# boreholes = [gt.boreholes.Borehole(H, 0, r_b, B*np.cos(phi), B*np.sin(phi), tilt=tilt, orientation=phi) for phi in np.linspace(0, 2*np.pi, Nb, endpoint=False)]
+# gt_borefield = gt.borefield.Borefield.from_boreholes(boreholes)
+phis = np.linspace(0, 2*np.pi, Nb, endpoint=False)
+gt_borefield = gt.borefield.Borefield(H, 0, r_b, B*np.cos(phis), B*np.sin(phis), tilt, phis)
+
+# gt.boreholes.visualize_field(gt_borefield)
+# gfunc = gt.gfunction.gFunction(gt_borefield, alpha, method='similarities')
+# times = gt.load_aggregation.ClaessonJaved(3600, 1 * 8760 * 3600).get_times_for_simulation()
+# gfunc.evaluate_g_function(times)
+# gfunc.visualize_g_function()
+# plt.show()
+
 
 borefield.set_borefield(gt_borefield)
+borefield.set_options_gfunction_calculation(options={'linear_threshold': 10*3600})
 # borefield.create_custom_dataset(options={'method': 'similarities'})
 
-length = borefield.size(L4_sizing=True) #each borehole length
+length = borefield.size(H_init=60, L4_sizing=True) #each borehole length
 depth = length * np.cos(tilt)
 tip_radius = B + length * np.sin(tilt)
 
 print("\n\nThe chosen layout:")
-print(f"A ring of {Nb} boreholes (r={B:.2f} m), of length: {length:.1f} m (depth: {depth:.2f} m, bh tip radius: {tip_radius:.2f}) at an angle of {np.rad2deg(tilt):.2f}°")
+print(f"A ring of {Nb} boreholes (r={B:.2f} m), of length: {length:.1f} m (depth: {depth:.2f} m, bh tip radius: {tip_radius:.2f}) at an angle of {np.rad2deg(tilt):.2f}°. Total length: {length*Nb:.1f} m")
 print("\n")
 print(f"{borefield.limiting_quadrant = }")
 

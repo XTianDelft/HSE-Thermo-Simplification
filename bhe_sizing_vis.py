@@ -1,7 +1,8 @@
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
+import matplotlib.colors
+import matplotlib.patches as mpatches
 
 r_b = 0.125
 def calc_depth_and_radius(angle, Nb, length):
@@ -21,7 +22,7 @@ def calc_depth_and_radius(angle, Nb, length):
 R_max = 15  # max property radius in m
 H_max = 40  # max depth in m
 
-results_name = 'results-profile-test.pkl'
+results_name = 'results-71.pkl'
 with open('results/' + results_name, "rb") as f:
     saved_dict = pickle.load(f)
 
@@ -39,6 +40,8 @@ for i in range(len(angles)):
 
 # --- Plotting code: ---
 ang_vals, nb_vals = np.meshgrid(angles, nb_range, indexing='ij')
+print('plotting for angles: ', angles)
+print('and Nbs: ', nb_range)
 
 
 contour_extent = (nb_range.min(), nb_range.max(), angles.min(), angles.max())
@@ -70,12 +73,37 @@ def plot_binary_constraints():
     contour_plot(valid_lengths, 'white', len_contour_min, len_contour_min+50, 10)
 
     # mark parts where constraints are not met red (depth) and orange (property radius)
-    plt.contourf(depth, levels=[H_max, depth.max()+1], colors='#ff000080', origin='lower', extent=contour_extent)
-    plt.contourf(radius, levels=[R_max, radius.max()], colors='#ff600080', origin='lower', extent=contour_extent)
+    plt.contourf(depth, levels=[H_max, np.nanmax(depth)+1], colors='#ff000080', origin='lower', extent=contour_extent)
+    plt.contourf(radius, levels=[R_max, np.nanmax(radius)], colors='#ff600080', origin='lower', extent=contour_extent)
+
     print(contour_extent)
 
+def plot_all_pixels():
+    constraint_mask = (depth <= H_max) & (radius <= R_max)# & (ang_vals >= 10)
+    valid_lengths = lengths.copy()
+    valid_lengths[~constraint_mask] = np.float64('nan')
+
+    plt.imshow(lengths, cmap='viridis', vmin=np.nanmin(valid_lengths), vmax=np.nanmax(valid_lengths), aspect='auto', origin='lower', extent=imshow_extent)
+    plt.colorbar()
+
+    colors = ['none', 'fuchsia', 'red', 'maroon']
+    cmap = matplotlib.colors.ListedColormap(colors)
+    im = ((depth > H_max) << 1) | (radius > R_max)
+    # plot where which constraints are violated
+    plt.imshow(im, cmap=cmap, aspect='auto', origin='lower', extent=imshow_extent)
+
+    legend_colors = colors[1:]
+    legend_labels = ['radius violated', 'depth violated', 'both violated']
+    patches = [mpatches.Patch(color=legend_colors[i], label=legend_labels[i]) for i in range(len(legend_colors))]
+    plt.legend(loc='upper left', handles=patches)
+
+
+
+
+plot_all_pixels()
+
 # plot_all_contour()
-plot_binary_constraints()
+# plot_binary_constraints()
 
 plt.xlabel('number of boreholes')
 plt.xticks(nb_range)
@@ -86,5 +114,6 @@ plt.ylim(angles.min(), angles.max())
 plt.tight_layout()
 plot_filename = f'results/config_space_plot-{results_name.split(".")[0]}.pdf'
 plt.savefig(plot_filename)
+plt.savefig(plot_filename.replace('.pdf', '.png'), dpi=360)
 plt.show()
 

@@ -1,5 +1,5 @@
 import pickle
-from multiprocessing import Pool
+from tqdm.contrib.concurrent import process_map
 import pygfunction as gt
 from GHEtool import *
 import time
@@ -17,13 +17,21 @@ Tf_max = 16
 Tf_min = 0
 
 max_tilt = 45
-max_nb = 20
+max_nb = 10
 
 # number of processes that simultaneously calculate the lengths
 # for different tilt angles and number of boreholes
-nr_of_processes = 12
-high_res = False
+do_parallel = True
+nr_of_processes = 4
+high_res = True
 plot_heat_profile = True
+
+sizing_kwargs = {
+    'atol': 0.2,
+    'rtol': 0.01,
+}
+
+gfunc_options = {'linear_threshold': 5*3600}
 
 ground = GroundConstantTemperature(k_g, T_g, Cp)
 
@@ -36,8 +44,9 @@ profiles_filenames = [
     # 'profile-test-capped.xlsx',
 
     '71.xlsx',
-    # '69.xlsx',
-    # '67.xlsx',
+    '69.xlsx',
+    '67.xlsx',
+    '67.xlsx',
 ]
 
 results_root = 'results/'
@@ -82,10 +91,17 @@ def size_bh_ring(degangle, Nb):
     H = 30  # arbitrary initial norehole length (in meters)
     B = r_b/np.sin(np.pi/Nb)+.1  # radial Separation of borehole heads
 
-    boreholes = [gt.boreholes.Borehole(H, 0, r_b, B*np.cos(phi), B*np.sin(phi), tilt=tilt, orientation=phi) for phi in np.linspace(0, 2*np.pi, Nb, endpoint=False)]
-    borefield.set_borefield(gt.borefield.Borefield.from_boreholes(boreholes))
+    phis = np.linspace(0, 2*np.pi, Nb, endpoint=False)
+    gt_borefield = gt.borefield.Borefield(H, 0, r_b, B*np.cos(phis), B*np.sin(phis), tilt, phis)
+    borefield.set_borefield(gt_borefield)
+    borefield.set_options_gfunction_calculation(options=gfunc_options)
 
-    length = borefield.size(L4_sizing=True) #each borehole length
+    try:
+        length = borefield.size(L4_sizing=True, **sizing_kwargs) #each borehole length
+    except VariableClasses.BaseClass.MaximumNumberOfIterations:
+        print(f'ERROR: tilt = {degangle:.2f}°, Nb = {Nb} did not converge')
+        length = np.float64('NaN')
+
     #print(f"Each BH is: {length} m")
     length_total = length*Nb
 
@@ -98,24 +114,31 @@ if high_res:
     nb_range = np.arange(1, max_nb+1)
 else:
     angles = np.linspace(0, max_tilt, 10)
-    nb_range = np.arange(1, max_nb+1, 2)
+    nb_range = np.arange(1, max_nb+1, 1)
 nr_inputs = len(angles)*len(nb_range)
 
 # Generate all the combinations for the inputs as a list of tuples
-ang_vals, nb_vals = np.meshgrid(angles, nb_range)
+ang_vals, nb_vals = np.meshgrid(angles, nb_range, indexing='ij')
 inputs = list(zip(ang_vals.ravel(), nb_vals.ravel()))
 
 # Wrapper function that unpacks the tuple containing the inputs
 def do_sizing(inputs):
     degangle, Nb = inputs
-    print(f'sizing {Nb} boreholes, {degangle}° tilted')
+    # print(f'sizing {Nb} boreholes, {degangle}° tilted')
     total_length = size_bh_ring(degangle, Nb)
-    print(f'done ({Nb}, {degangle}°): {total_length/Nb:.2f}')
+    # print(f'done ({Nb}, {degangle}°): {total_length/Nb:.2f}')
     return total_length
 
 starttime = time.time()
-with Pool(nr_of_processes) as p:
-    outputs = p.map(do_sizing, inputs)
+
+if do_parallel:
+    outputs = process_map(do_sizing, inputs, max_workers=nr_of_processes)
+else:
+    outputs = np.zeros_like(inputs, dtype=np.float64)
+    for i, inp in enumerate(inputs):
+        print(f'{i+1}/{len(inputs)}')
+        outputs[i] = do_sizing(inp)
+
 print(f'took {time.time() - starttime:.3f} sec')
 
 outputs = np.array(outputs)
