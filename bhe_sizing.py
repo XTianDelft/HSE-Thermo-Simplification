@@ -22,7 +22,7 @@ Tf_min = 0
 tilt = np.deg2rad(13)
 H = 40 #Arbitrary Initial Borehole length (in meters)
 Nb = 8 #Number of Boreholes
-B = r_b/np.sin(np.pi/Nb)+.1 #Radial Separation of borehole heads
+B = (r_b+.05)/np.sin(np.pi/Nb) #Radial Separation of borehole heads
 # print("Borehole Radial Head Separation(Radius): ",B," [m]")
 
 

@@ -17,7 +17,7 @@ Tf_max = 16
 Tf_min = 0
 
 max_tilt = 45
-max_nb = 10
+max_nb = 20
 
 # number of processes that simultaneously calculate the lengths
 # for different tilt angles and number of boreholes
@@ -89,7 +89,7 @@ def size_bh_ring(degangle, Nb):
     # size a borefield using a custom field with pygfunction
     tilt = np.deg2rad(degangle)
     H = 30  # arbitrary initial norehole length (in meters)
-    B = r_b/np.sin(np.pi/Nb)+.1  # radial Separation of borehole heads
+    B = (r_b+.05)/np.sin(np.pi/Nb)  # radial Separation of borehole heads
 
     phis = np.linspace(0, 2*np.pi, Nb, endpoint=False)
     gt_borefield = gt.borefield.Borefield(H, 0, r_b, B*np.cos(phis), B*np.sin(phis), tilt, phis)

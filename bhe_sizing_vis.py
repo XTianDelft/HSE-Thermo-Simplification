@@ -9,7 +9,7 @@ def calc_depth_and_radius(angle, Nb, length):
     radangle = np.deg2rad(angle)
 
     depth = np.cos(radangle)*length
-    radius = np.sin(radangle)*length+(0 if Nb == 1 else r_b/np.sin(np.pi/Nb)+.1)
+    radius = np.sin(radangle)*length+(0 if Nb == 1 else (r_b+.05)/np.sin(np.pi/Nb))
 
     # radius_violated =  > max_radius
     # depth_violated =  > max_depth
@@ -19,10 +19,10 @@ def calc_depth_and_radius(angle, Nb, length):
     return depth, radius
 
 
-R_max = 15  # max property radius in m
-H_max = 40  # max depth in m
+R_max = 35  # max property radius in m
+H_max = 50  # max depth in m
 
-results_name = 'results-71.pkl'
+results_name = 'results-67-LOWRES.pkl'
 with open('results/' + results_name, "rb") as f:
     saved_dict = pickle.load(f)
 
@@ -42,7 +42,10 @@ for i in range(len(angles)):
 ang_vals, nb_vals = np.meshgrid(angles, nb_range, indexing='ij')
 print('plotting for angles: ', angles)
 print('and Nbs: ', nb_range)
-
+print('\nlengths:')
+print(np.array2string(lengths/nb_range, precision=1))
+print(f'depth: min, mean, max => {depth.min():.2f}, {depth.mean():.2f}, {depth.max():.2f}')
+print(f'radius: min, mean, max => {radius.min():.2f}, {radius.mean():.2f}, {radius.max():.2f}')
 
 contour_extent = (nb_range.min(), nb_range.max(), angles.min(), angles.max())
 
@@ -90,7 +93,7 @@ def plot_all_pixels():
     cmap = matplotlib.colors.ListedColormap(colors)
     im = ((depth > H_max) << 1) | (radius > R_max)
     # plot where which constraints are violated
-    plt.imshow(im, cmap=cmap, aspect='auto', origin='lower', extent=imshow_extent)
+    plt.imshow(im, cmap=cmap, vmin=0, vmax=3, aspect='auto', origin='lower', extent=imshow_extent)
 
     legend_colors = colors[1:]
     legend_labels = ['radius violated', 'depth violated', 'both violated']
