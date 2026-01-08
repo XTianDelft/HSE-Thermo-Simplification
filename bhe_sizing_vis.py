@@ -4,38 +4,51 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 import matplotlib.patches as mpatches
 
-r_b = 0.125
-def calc_depth_and_radius(angle, Nb, length):
-    radangle = np.deg2rad(angle)
 
-    depth = np.cos(radangle)*length
-    radius = np.sin(radangle)*length+(0 if Nb == 1 else (r_b+.05)/np.sin(np.pi/Nb))
-
-    # radius_violated =  > max_radius
-    # depth_violated =  > max_depth
-    # return radius_violated*2 + depth_violated
-    # return not radius_violated and not depth_violated
-
-    return depth, radius
-
-
-R_max = 35  # max property radius in m
+# R_max = float('inf')
+R_max = 25  # max property radius in m
 H_max = 50  # max depth in m
 
-results_name = 'results-67-LOWRES.pkl'
-with open('results/' + results_name, "rb") as f:
+results_name = 'results-Acaciastraat2.pkl'
+results_fp = 'results/' + results_name
+print(f'loading {results_fp}')
+with open(results_fp, "rb") as f:
     saved_dict = pickle.load(f)
 
 angles = saved_dict['angles']
 nb_range = saved_dict['nb_range']
 lengths = saved_dict['lengths']
 
+per_meter_cost = 16
+per_bh_cost = 100
+def calc_cost(total_length, Nb):
+    return total_length*per_meter_cost + Nb*per_bh_cost
 
-depth = np.zeros((len(angles), len(nb_range)))
+r_b = 0.125
+def calc_B(Nb):
+    if Nb == 1:
+        return 0
+    else:
+        return (r_b+.05)/np.sin(np.pi/Nb)
+
+def calc_depth_and_radius(angle, Nb, length):
+    radangle = np.deg2rad(angle)
+    depth = np.cos(radangle)*length
+    radius = np.sin(radangle)*length+calc_B(Nb)
+
+    return depth, radius
+
+depth = np.zeros((len(angles), len(nb_range)), dtype=np.float64)
 radius = np.zeros_like(depth)
+costs = np.zeros_like(depth)
+
 for i in range(len(angles)):
     for j in range(len(nb_range)):
-        depth[i,j], radius[i,j] = calc_depth_and_radius(angles[i], nb_range[j], lengths[i,j]/nb_range[j])
+        ang = angles[i]
+        Nb = nb_range[j]
+        length = lengths[i,j]
+        depth[i,j], radius[i,j] = calc_depth_and_radius(ang, Nb, length/Nb)
+        costs[i,j] = calc_cost(length, Nb)
 
 
 # --- Plotting code: ---
@@ -82,24 +95,42 @@ def plot_binary_constraints():
     print(contour_extent)
 
 def plot_all_pixels():
-    constraint_mask = (depth <= H_max) & (radius <= R_max)# & (ang_vals >= 10)
-    valid_lengths = lengths.copy()
-    valid_lengths[~constraint_mask] = np.float64('nan')
-
-    plt.imshow(lengths, cmap='viridis', vmin=np.nanmin(valid_lengths), vmax=np.nanmax(valid_lengths), aspect='auto', origin='lower', extent=imshow_extent)
-    plt.colorbar()
-
+    # plot constraint violations
     colors = ['none', 'fuchsia', 'red', 'maroon']
     cmap = matplotlib.colors.ListedColormap(colors)
     im = ((depth > H_max) << 1) | (radius > R_max)
     # plot where which constraints are violated
     plt.imshow(im, cmap=cmap, vmin=0, vmax=3, aspect='auto', origin='lower', extent=imshow_extent)
 
-    legend_colors = colors[1:]
-    legend_labels = ['radius violated', 'depth violated', 'both violated']
-    patches = [mpatches.Patch(color=legend_colors[i], label=legend_labels[i]) for i in range(len(legend_colors))]
-    plt.legend(loc='upper left', handles=patches)
+    # plot costs
+    constraint_mask = (depth <= H_max) & (radius <= R_max)# & (ang_vals >= 10)
+    valid_costs = costs.copy()
+    valid_costs[~constraint_mask] = np.float64('nan')
+    plt.imshow(valid_costs, cmap='viridis', vmin=np.nanmin(valid_costs), vmax=np.nanmax(valid_costs), aspect='auto', origin='lower', extent=imshow_extent)
+    plt.colorbar()
 
+    # mark minimum cost
+    ang_idx, nb_idx = np.unravel_index(np.nanargmin(valid_costs), valid_costs.shape)
+    best_nb = nb_range[nb_idx]
+    best_ang = angles[ang_idx]
+    best_len = lengths[ang_idx, nb_idx]
+    best_cost = valid_costs[ang_idx, nb_idx]
+    plt.scatter(best_nb, best_ang, c='white', edgecolors='black', label=f'min. cost: (€{per_meter_cost} $L$ + €{per_bh_cost})$N_b$ = €{best_cost:.0f}\n$L={best_len/best_nb:.1f}$ m at {best_ang:.0f}°, $N_b={best_nb}$')
+
+    print('\nthe best configuration is as follows:')
+    print(f'{Nb = :d} (B = {calc_B(best_nb):.2f} m), tilt = {best_ang:.1f}° =>\nlength = {best_len:.2f} m, depth = {depth[ang_idx, nb_idx]:.2f} m, radius = {radius[ang_idx, nb_idx]:.2f} m')
+
+    # add constraint violations to the legend
+    handles, labels = plt.gca().get_legend_handles_labels()
+
+    legend_colors = colors[1:]
+    legend_labels = [f'radius violated\n$r > {R_max}$ m',
+                     f'depth violated\n$h > {H_max}$ m', 'both violated']
+    new_handles = [mpatches.Patch(color=legend_colors[i], label=legend_labels[i]) for i in range(len(legend_colors))]
+
+    new_handles.extend(handles)
+
+    plt.legend(bbox_to_anchor=(-.1, 1.14), loc="upper left", ncols=len(new_handles), handles=new_handles)
 
 
 
@@ -114,7 +145,9 @@ plt.xlim(nb_range.min(), nb_range.max())
 plt.ylabel('tilt angle $\\theta$ (deg)')
 plt.ylim(angles.min(), angles.max())
 
+plt.gcf().set_size_inches(8.4, 6)
 plt.tight_layout()
+plt.subplots_adjust(right=1)
 plot_filename = f'results/config_space_plot-{results_name.split(".")[0]}.pdf'
 plt.savefig(plot_filename)
 plt.savefig(plot_filename.replace('.pdf', '.png'), dpi=360)
