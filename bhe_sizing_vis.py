@@ -9,7 +9,7 @@ import matplotlib.patches as mpatches
 R_max = 25  # max property radius in m
 H_max = 50  # max depth in m
 
-results_name = 'results-Acaciastraat1.pkl'
+results_name = 'results-Acaciastraat7.pkl'
 results_fp = 'results/' + results_name
 print(f'loading {results_fp}')
 with open(results_fp, "rb") as f:
@@ -152,4 +152,3 @@ plot_filename = f'results/config_space_plot-{results_name.split(".")[0]}.pdf'
 plt.savefig(plot_filename)
 plt.savefig(plot_filename.replace('.pdf', '.png'), dpi=360)
 plt.show()
-

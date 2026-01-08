@@ -8,7 +8,7 @@ multi_area_filenames = {
         'Acaciastraat3': ['A67', 'A67'],
         'Acaciastraat4': ['A67'],
         'Acaciastraat6': ['A71', 'A69'],
-        'Acaciastraat7': ['A71', 'A69'],
+        'Acaciastraat7': ['A67', 'A67', 'A67'],
 
         'Eikstraat1': ['E37', 'E35'],
         'Eikstraat2': ['E33', 'E31', 'E35'],
@@ -43,6 +43,8 @@ for area in areas:
     area_profiles_fns = multi_area_filenames[area]
     area_root = profile_root + area + '/'
     for case_name, profile_names in area_profiles_fns.items():
+        if case_name != 'Acaciastraat7':
+            continue
         fns_with_ext = []
         living_space = 0
         for profile_name in profile_names:
