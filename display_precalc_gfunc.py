@@ -2,7 +2,7 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-precalc_fp = 'results/precalc_borefields-k_g=2.80-Cp=2.80e+06-T_g=10.0-LOWRES.pkl'
+precalc_fp = 'results/precalc_borefields-k_g=2.18-Cp=2.93e+06-T_g=10.0-HIGHRES.pkl'
 
 print(f'loading {precalc_fp}')
 with open(precalc_fp, "rb") as f:
@@ -35,10 +35,14 @@ gfuncs = bh.custom_gfunction.gvalues_array
 bh_lens = bh.custom_gfunction.borehole_length_array
 time_arr = bh.custom_gfunction.time_array
 
+len_min = bh_lens.min()
+len_max = bh_lens.max()
+
 for len_idx in range(0, len(bh_lens)):
     bh_len = bh_lens[len_idx]
-    plt.plot(np.log(time_arr), gfuncs[len_idx], label=bh_len)
+    plt.semilogx(time_arr, gfuncs[len_idx], color=plt.cm.jet(((bh_len - len_min) / (len_max - len_min))**.3), label=bh_len)
 
-plt.legend(ncol=4)
+plt.legend(ncol=4, fontsize=7)
+plt.gcf().set_size_inches(8, 5)
 plt.tight_layout()
 plt.show()

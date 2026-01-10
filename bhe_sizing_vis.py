@@ -9,7 +9,7 @@ import matplotlib.patches as mpatches
 R_max = 25  # max property radius in m
 H_max = 50  # max depth in m
 
-results_name = 'results-Havenstraat5.pkl'
+results_name = 'results-Acaciastraat2.pkl'
 results_fp = 'results/' + results_name
 print(f'loading {results_fp}')
 with open(results_fp, "rb") as f:
@@ -107,7 +107,8 @@ def plot_all_pixels():
     valid_costs = costs.copy()
     valid_costs[~constraint_mask] = np.float64('nan')
     plt.imshow(valid_costs, cmap='viridis', vmin=np.nanmin(valid_costs), vmax=np.nanmax(valid_costs), aspect='auto', origin='lower', extent=imshow_extent)
-    plt.colorbar()
+    plt.colorbar(label='Cost according sizing (€)')
+
 
     # mark minimum cost
     ang_idx, nb_idx = np.unravel_index(np.nanargmin(valid_costs), valid_costs.shape)
@@ -151,4 +152,4 @@ plt.subplots_adjust(right=1)
 plot_filename = f'results/config_space_plot-{results_name.split(".")[0]}.pdf'
 plt.savefig(plot_filename)
 plt.savefig(plot_filename.replace('.pdf', '.png'), dpi=360)
-# plt.show()
+plt.show()

@@ -39,8 +39,8 @@ soil_type_lut = {
 }
 
 precalc_fp_lut = {
-    'sand': 'precalc_borefields-k_g=2.18-Cp=2.93e+06-T_g=10.0-LOWRES.pkl',
-    'clay': 'precalc_borefields-k_g=1.59-Cp=2.93e+06-T_g=10.0-LOWRES.pkl'
+    'sand': 'precalc_borefields-k_g=2.18-Cp=2.93e+06-T_g=10.0-HIGHRES.pkl',
+    'clay': 'precalc_borefields-k_g=1.59-Cp=2.93e+06-T_g=10.0-HIGHRES.pkl'
 }
 
 results_root = 'results/'

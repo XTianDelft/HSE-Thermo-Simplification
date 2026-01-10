@@ -138,7 +138,7 @@ def size_case_precalc(case_name, case_heat_profile, angles, nb_range, borefields
                 length_total = length*nb_range[nb_idx]
                 lengths[ang_idx, nb_idx] = length_total
             except:
-                print(f'ERROR sizing {angles[ang_len]}°, {nb_range[nb_idx]} for {case_name}')
+                print(f'ERROR sizing {angles[ang_idx]}°, {nb_range[nb_idx]} for {case_name}')
                 lengths[ang_idx, nb_idx] = float('NaN')
 
     saved_dict = {
