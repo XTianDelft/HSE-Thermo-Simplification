@@ -9,7 +9,7 @@ import matplotlib.patches as mpatches
 R_max = 25  # max property radius in m
 H_max = 50  # max depth in m
 
-results_name = 'results-Acaciastraat7.pkl'
+results_name = 'results-Havenstraat5.pkl'
 results_fp = 'results/' + results_name
 print(f'loading {results_fp}')
 with open(results_fp, "rb") as f:
@@ -56,7 +56,7 @@ ang_vals, nb_vals = np.meshgrid(angles, nb_range, indexing='ij')
 print('plotting for angles: ', angles)
 print('and Nbs: ', nb_range)
 print('\nlengths:')
-print(np.array2string(lengths/nb_range, precision=1))
+print(np.array2string(lengths, precision=1))
 print(f'depth: min, mean, max => {depth.min():.2f}, {depth.mean():.2f}, {depth.max():.2f}')
 print(f'radius: min, mean, max => {radius.min():.2f}, {radius.mean():.2f}, {radius.max():.2f}')
 
@@ -151,4 +151,4 @@ plt.subplots_adjust(right=1)
 plot_filename = f'results/config_space_plot-{results_name.split(".")[0]}.pdf'
 plt.savefig(plot_filename)
 plt.savefig(plot_filename.replace('.pdf', '.png'), dpi=360)
-plt.show()
+# plt.show()

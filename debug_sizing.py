@@ -2,21 +2,35 @@ import pygfunction as gt
 import numpy as np
 import matplotlib.pyplot as plt
 
+from GHEtool.VariableClasses.Cylindrical_correction import update_pygfunction
+update_pygfunction()
 
-B = .7
+r_b = 0.125
+Nb = 15
+tilt = 27
+H = 5
+B = (r_b+.05)/np.sin(np.pi/Nb)
+
+gfunc_options = {
+    'method': 'similarities',
+    'linear_threshold': 5*3600,
+    'cylindrical_correction': True,
+}
+
 phis = np.linspace(0, 2*np.pi, 16, endpoint=False)
-borefield = gt.borefield.Borefield(14, 0, .125, B*np.cos(phis), B*np.sin(phis), np.deg2rad(15), phis)
+borefield = gt.borefield.Borefield(H, 0, .125, B*np.cos(phis), B*np.sin(phis), np.deg2rad(tilt), phis)
 
 
 alpha = 1e-6
-time_values = gt.load_aggregation.ClaessonJaved(3600, 1 * 8760 * 3600).get_times_for_simulation()
+time_values = gt.load_aggregation.ClaessonJaved(3600, 20 * 8760 * 3600).get_times_for_simulation()
 method = 'similarities'
 
 print(time_values)
 
-gfunc = gt.gfunction.gFunction(borefield, alpha, time_values, method=method)
+gfunc = gt.gfunction.gFunction(borefield, alpha, time_values, options=gfunc_options, method=method)
 gfunc.visualize_g_function()
 plt.show()
+
 
 '''
   File "/proj/Projects/Uni/EE_BSc/minor/bhe_proj/HSE-Thermo-Simplification/bhe_sizing.py", line 91, in <module>

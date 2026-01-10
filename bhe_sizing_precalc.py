@@ -6,10 +6,21 @@ from GHEtool import *
 from heat_profile import *
 
 T_g = 10     # undisturbed ground temperature
-k_g = 2.8   # ground thermal conductivity
-Cp = 2.8e6  # ground volumetric heat capacity in J/m3K
-Rb = 0.1125
+Rb = 0.1125  # effective borehole thermal resistance
 r_b = 0.125 # Borehole radius
+
+soil_type = 'clay'
+match soil_type:
+    case 'sand':
+        k_g = 2.1771   # ground thermal conductivity
+        Cp = 2.9288e6  # ground volumetric heat capacity in J/m3K
+    case 'clay':
+        k_g = 1.591   # ground thermal conductivity
+        Cp = 2.9288e6  # ground volumetric heat capacity in J/m3K
+    case _:
+        print(f'unknown soil type {soil_type}')
+        exit(1)
+ground = GroundConstantTemperature(k_g, T_g, Cp)
 
 # min and max fluid temperatures
 Tf_max = 16
@@ -21,17 +32,19 @@ max_nb = 20
 # number of processes that simultaneously calculate the lengths
 # for different tilt angles and number of boreholes
 do_parallel = True
-nr_of_processes = 8
-high_res = False
+nr_of_processes = 6
+high_res = True
 
-gfunc_options = {'linear_threshold': 10*3600}
+gfunc_options = {
+    'method': 'similarities',
+    'linear_threshold': 5*3600
+}
 
-ground = GroundConstantTemperature(k_g, T_g, Cp)
 
 if high_res:
-    precalc_lengths = np.concat([np.arange(5, 20, 2), np.arange(20, 70, .5), np.arange(70, 100, 2), np.arange(100, 300+1, 10)])
+    precalc_lengths = np.concat([np.arange(10, 20, 2), np.arange(20, 70, 1), np.arange(70, 100, 2), np.arange(100, 200, 10), np.arange(200, 500+1, 50), [1000, 2000]])
 else:
-    precalc_lengths = np.concat([np.arange(5, 20, 5), np.arange(20, 70, 2), np.arange(70, 10, 10)], np.arange(100, 300+1, 50))
+    precalc_lengths = np.concat([np.arange(10, 70, 5), np.arange(70, 100, 10), np.arange(100, 300+1, 50), [500, 1000]])
 print(f'{len(precalc_lengths) = }')
 def generate_precalc_borefield(inputs):
     degangle, Nb = inputs
@@ -50,9 +63,18 @@ def generate_precalc_borefield(inputs):
     phis = np.linspace(0, 2*np.pi, Nb, endpoint=False)
     gt_borefield = gt.borefield.Borefield(H, 0, r_b, B*np.cos(phis), B*np.sin(phis), tilt, phis)
     borefield.set_borefield(gt_borefield)
-    borefield.set_options_gfunction_calculation(options=gfunc_options)
 
-    borefield.create_custom_dataset(borehole_length_array=precalc_lengths, options={'method': 'similarities'})
+    borefield.create_custom_dataset(borehole_length_array=precalc_lengths, options=gfunc_options)
+
+    gfuncs = borefield.custom_gfunction.gvalues_array
+    bh_lens = borefield.custom_gfunction.borehole_length_array
+    time_arr = borefield.custom_gfunction.time_array
+
+    if (gfuncs < 0).any():
+        print("ERROR: Negative g-functions")
+        ids_len = np.where((gfuncs < 0).any(axis=1))[0]
+        print(f'negative gfunc for {degangle}°, {Nb} at lengths: {bh_lens[ids_len]}')
+        return float('NaN')
 
     return borefield
 
@@ -60,11 +82,11 @@ def generate_precalc_borefield(inputs):
 # prepare all possible borefield configurations
 def precalc_borefields(results_root):
     if high_res:
-        angles = np.linspace(0, max_tilt, max_tilt+1)
+        angles = np.linspace(0, max_tilt, max_tilt//3+1)
         nb_range = np.arange(1, max_nb+1)
     else:
         angles = np.linspace(0, max_tilt, 10)
-        nb_range = np.arange(1, max_nb+1, 1)
+        nb_range = np.arange(1, max_nb+1, 2)
 
     # Generate all the combinations for the inputs as a list of tuples
     ang_vals, nb_vals = np.meshgrid(angles, nb_range, indexing='ij')
