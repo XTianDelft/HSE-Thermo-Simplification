@@ -46,14 +46,16 @@ precalc_fp_lut = {
 results_root = 'results/'
 
 areas = multi_area_filenames.keys()
-print('Areas:', ' '.join(areas))
+
+if __name__ == '__main__':
+    print('Areas:', ' '.join(areas))
 
 
-for area in areas:
-    cases = multi_area_filenames[area]
-    area_root = profile_root + area + '/'
+    for area in areas:
+        cases = multi_area_filenames[area]
+        area_root = profile_root + area + '/'
 
-    soil_type = soil_type_lut[area]
-    precalc_fp = results_root + precalc_fp_lut[soil_type]
+        soil_type = soil_type_lut[area]
+        precalc_fp = results_root + precalc_fp_lut[soil_type]
 
-    size_multiple_cases(cases, area_root, results_root, precalc_fp)
+        size_multiple_cases(cases, area_root, results_root, precalc_fp)

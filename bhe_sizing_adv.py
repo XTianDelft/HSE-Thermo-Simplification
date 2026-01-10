@@ -2,6 +2,7 @@ import pickle
 from tqdm.contrib.concurrent import process_map
 import pygfunction as gt
 from GHEtool import *
+from GHEtool.VariableClasses.BaseClass import MaximumNumberOfIterations
 import time
 
 from heat_profile import *
@@ -10,20 +11,20 @@ from heat_profile import *
 # k_g = 2.8   # ground thermal conductivity
 # Cp = 2.8e6  # ground volumetric heat capacity in J/m3K
 # ground = GroundConstantTemperature(k_g, T_g, Cp)
-Rb = 0.1125
-r_b = 0.125 #Borehole radius
+# Rb = 0.1125
+# r_b = 0.125 #Borehole radius
 
 # min and max fluid temperatures
-Tf_max = 16
-Tf_min = 0
+# Tf_max = 16
+# Tf_min = 0
 
-max_tilt = 45
-max_nb = 20
+# max_tilt = 45
+# max_nb = 20
 
 # number of processes that simultaneously calculate the lengths
 # for different tilt angles and number of boreholes
 do_parallel = True
-nr_of_processes = 12
+# nr_of_processes = 12
 high_res = False
 plot_heat_profile = True
 use_precalc = True
@@ -65,34 +66,8 @@ def plot_case_heat_profile(case_heat_profile, plot_fn):
     #     plt.gca().secondary_yaxis('right', functions=fs).set_ylabel('normalized heat load (W/m²)')
     plt.tight_layout()
     plt.savefig(plot_fn)
+    plt.clf()
 
-def size_multiple_cases(cases, profile_root, results_root, precalc_filepath):
-    # gather the case profiles
-    cases_heat_profile = {}
-    for case_name, fns in cases.items():
-        fns_with_ext = list(map(lambda fn: fn + '.xlsx', fns))
-        print(f'Loading and summing profiles for {case_name}:')
-        total_heat_profile = load_profiles_and_sum(fns_with_ext, profile_root)
-        cases_heat_profile[case_name] = total_heat_profile
-        if plot_heat_profile:
-            plot_case_heat_profile(total_heat_profile, results_root + f'heat_profile-{case_name}.pdf')
-
-    # load precalculated borefields
-    print(f'loading {precalc_filepath}')
-    with open(precalc_filepath, "rb") as f:
-        saved_dict = pickle.load(f)
-
-    angles = saved_dict['angles']
-    nb_range = saved_dict['nb_range']
-    borefields = saved_dict['borefields']
-
-    # size each case
-    for case_name, case_heat_profile in cases_heat_profile.items():
-        size_case_precalc(case_name, case_heat_profile, angles, nb_range, borefields)
-
-
-def size_precalc(inputs):
-    degangle, Nb = inputs
 
 def size_case_precalc(case_name, case_heat_profile, angles, nb_range, borefields):
     print(f'Sizing {case_name}: total heat energy: {case_heat_profile.sum() / 1e6 :.1f} MWh')
@@ -105,7 +80,7 @@ def size_case_precalc(case_name, case_heat_profile, angles, nb_range, borefields
     lengths = np.zeros((ang_len, len(nb_range)), dtype=np.float64)
     for ang_idx in range(ang_len):
         for nb_idx in range(nb_len):
-            print(f'{ang_idx}/{ang_len} {nb_idx}/{nb_len}')
+            print(f'{case_name}: {ang_idx}/{ang_len} {nb_idx}/{nb_len} => {angles[ang_idx]}°, {nb_range[nb_idx]}')
 
             if use_precalc:
                 borefield = borefields[ang_idx, nb_idx]
@@ -137,7 +112,7 @@ def size_case_precalc(case_name, case_heat_profile, angles, nb_range, borefields
                 length = borefield.size(L4_sizing=True)
                 length_total = length*nb_range[nb_idx]
                 lengths[ang_idx, nb_idx] = length_total
-            except:
+            except MaximumNumberOfIterations:
                 print(f'ERROR sizing {angles[ang_idx]}°, {nb_range[nb_idx]} for {case_name}')
                 lengths[ang_idx, nb_idx] = float('NaN')
 
@@ -151,6 +126,40 @@ def size_case_precalc(case_name, case_heat_profile, angles, nb_range, borefields
     print(f'writing results to {results_filename}')
     with open(results_filename, "wb") as f_out:
         pickle.dump(saved_dict, f_out)
+
+def wrapper_size_case_precalc(inputs):
+    case_name, case_heat_profile, angles, nb_range, borefields = inputs
+    size_case_precalc(case_name, case_heat_profile, angles, nb_range, borefields)
+
+def size_multiple_cases(cases, profile_root, results_root, precalc_filepath):
+    # gather the case profiles
+    cases_heat_profile = {}
+    for case_name, fns in cases.items():
+        fns_with_ext = list(map(lambda fn: fn + '.xlsx', fns))
+        print(f'Loading and summing profiles for {case_name}:')
+        total_heat_profile = load_profiles_and_sum(fns_with_ext, profile_root)
+        cases_heat_profile[case_name] = total_heat_profile
+        if plot_heat_profile:
+            plot_case_heat_profile(total_heat_profile, results_root + f'heat_profile-{case_name}.pdf')
+
+    # load precalculated borefields
+    print(f'loading {precalc_filepath}')
+    with open(precalc_filepath, "rb") as f:
+        saved_dict = pickle.load(f)
+
+    angles = saved_dict['angles']
+    nb_range = saved_dict['nb_range']
+    borefields = saved_dict['borefields']
+
+    # size all cases
+    if do_parallel:
+        inputs = []
+        for case_name, case_heat_profile in cases_heat_profile.items():
+            inputs.append((case_name, case_heat_profile, angles, nb_range, borefields))
+        process_map(wrapper_size_case_precalc, inputs, max_workers=len(cases))
+    else:
+        for case_name, case_heat_profile in cases_heat_profile.items():
+            size_case_precalc(case_name, case_heat_profile, angles, nb_range, borefields)
 
 
 if __name__ == '__main__':
