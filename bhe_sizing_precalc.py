@@ -15,7 +15,7 @@ match soil_type:
         k_g = 2.1771   # ground thermal conductivity
         Cp = 2.9288e6  # ground volumetric heat capacity in J/m3K
     case 'clay':
-        k_g = 1.591   # ground thermal conductivity
+        k_g = 1.5910   # ground thermal conductivity
         Cp = 2.9288e6  # ground volumetric heat capacity in J/m3K
     case _:
         print(f'unknown soil type {soil_type}')

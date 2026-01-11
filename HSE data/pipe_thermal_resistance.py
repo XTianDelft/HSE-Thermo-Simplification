@@ -16,7 +16,7 @@ def COMSOL_convective_thermal_resistances(m_flow_borehole, cross_sect_area, hydr
     h = Nu*k_f/hydraulic_diameter
     return h
 
-def R_b_pyg(m_flow_borehole, T=3):
+def R_b_pyg(m_flow_borehole, T=3, do_custom_convection = True):
     k_s = 1.2     # Soil thermal conductivity
 
     # Borehole dimensions
@@ -63,29 +63,30 @@ def R_b_pyg(m_flow_borehole, T=3):
     R_out_pipe = gt.pipes.conduction_thermal_resistance_circular_pipe(r_out_in, r_out_out, k_p)
     R_grout = gt.pipes.conduction_thermal_resistance_circular_pipe(r_out_out, r_b, k_g)
 
-        # Fluid convection thermal resistances
-    # h_f_in = gt.pipes.convective_heat_transfer_coefficient_circular_pipe(
-    #         m_flow_borehole, r_in_in, mu_f, rho_f, k_f, cp_f, epsilon)
-    # R_in_conv = 1 / (h_f_in * 2 * np.pi * r_in_in)
+    # Fluid convection thermal resistances
+    if do_custom_convection:
+        h_f_in = gt.pipes.convective_heat_transfer_coefficient_circular_pipe(
+                m_flow_borehole, r_in_in, mu_f, rho_f, k_f, cp_f, epsilon)
+        R_in_conv = 1 / (h_f_in * 2 * np.pi * r_in_in)
 
-    # h_f_ann_inner, h_f_ann_outer = gt.pipes.convective_heat_transfer_coefficient_concentric_annulus(
-    #             m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon)
-    # D_h = 2 * (r_out_in - r_mid_out)
+        h_f_ann_inner, h_f_ann_outer = gt.pipes.convective_heat_transfer_coefficient_concentric_annulus(
+                    m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon)
+        D_h = 2 * (r_out_in - r_mid_out)
 
-    # Nu_a_in = h_f_ann_inner * D_h / k_f
-    # Nu_a_out = h_f_ann_outer * D_h / k_f
+        Nu_a_in = h_f_ann_inner * D_h / k_f
+        Nu_a_out = h_f_ann_outer * D_h / k_f
+    else:
+        Nseg = 10
+        L_char = 50/Nseg
+        h_f_in = COMSOL_convective_thermal_resistances(m_flow_borehole, np.pi*r_in_in**2, r_in_in*2, L_char, mu_f, rho_f, k_f, cp_f)
+        R_in_conv = 1 / (h_f_in * 2 * np.pi * r_in_in)
 
-    Nseg = 10
-    L_char = 50/Nseg
-    h_f_in = COMSOL_convective_thermal_resistances(m_flow_borehole, np.pi*r_in_in**2, r_in_in*2, L_char, mu_f, rho_f, k_f, cp_f)
-    R_in_conv = 1 / (h_f_in * 2 * np.pi * r_in_in)
-
-    # h_f_ann_inner, h_f_ann_outer = gt.pipes.convective_heat_transfer_coefficient_concentric_annulus(
-    #             m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon)
-    A_ann = np.pi * (r_out_in**2 - r_mid_out**2)
-    Dh_ann = 2*(r_out_in - r_mid_out)
-    h_f_ann_inner = COMSOL_convective_thermal_resistances(m_flow_borehole, A_ann, Dh_ann, L_char, mu_f, rho_f, k_f, cp_f)
-    h_f_ann_outer = COMSOL_convective_thermal_resistances(m_flow_borehole, A_ann, Dh_ann, L_char, mu_f, rho_f, k_f, cp_f)
+        # h_f_ann_inner, h_f_ann_outer = gt.pipes.convective_heat_transfer_coefficient_concentric_annulus(
+        #             m_flow_borehole, r_mid_out, r_out_in, mu_f, rho_f, k_f, cp_f, epsilon)
+        A_ann = np.pi * (r_out_in**2 - r_mid_out**2)
+        Dh_ann = 2*(r_out_in - r_mid_out)
+        h_f_ann_inner = COMSOL_convective_thermal_resistances(m_flow_borehole, A_ann, Dh_ann, L_char, mu_f, rho_f, k_f, cp_f)
+        h_f_ann_outer = COMSOL_convective_thermal_resistances(m_flow_borehole, A_ann, Dh_ann, L_char, mu_f, rho_f, k_f, cp_f)
 
     R_ann_out_conv = 1 / (h_f_ann_outer * 2 * np.pi * r_out_in)
     R_ann_in_conv = 1 / (h_f_ann_inner * 2 * np.pi * r_mid_out)
@@ -201,8 +202,9 @@ R_b_comsol_vec = np.vectorize(R_b_comsol)
 
 m_flow_values = np.linspace(0.01, 1, 1000)
 
-pyg_thermal_resistances = R_b_pyg_vec(m_flow_values)
-plt.plot(m_flow_values, pyg_thermal_resistances, label='pygfunction')
+plt.plot(m_flow_values, R_b_pyg_vec(m_flow_values), label='pygfunction')
+plt.plot(m_flow_values, R_b_pyg_vec(m_flow_values, do_custom_convection=False), label='pygfunction with COMSOL convection')
+
 
 # plt.plot(m_flow_values, pyg_thermal_resistances[0], label='pygfunction 1')
 # plt.plot(m_flow_values, pyg_thermal_resistances[1], label='pygfunction 2')

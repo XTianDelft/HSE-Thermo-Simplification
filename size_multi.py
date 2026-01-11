@@ -30,12 +30,32 @@ multi_area_filenames = {
         'Eilandstraat6': ['E23', 'E23', 'E21', 'E21'],
         'Eilandstraat7': ['E17', 'E17'],
         'Eilandstraat8': ['E13'],
+    },
+    'woudhuis': {
+        'Kennemerland1': ['K44', 'K46'],
+        'Kennemerland3': ['K34', 'K32', 'K32', 'K28', 'K28', 'K24'],
+        'Kennemerland4': ['K34', 'K32', 'K32'],
+        'Kennemerland5': ['K28', 'K28', 'K24'],
+        'Kennemerland6': ['K22', 'K20', 'K18', 'K16'],
+        'Kennemerland7': ['K22', 'K20'],
+        'Kennemerland8': ['K18', 'K16'],
+    },
+    'hillegersberg': {
+        'Jubileumplein1': ['J1', 'J2', 'J3', 'J4'],
+        'Jubileumplein2': ['J4', 'J1', 'J7', 'J7'],
+        'Jubileumplein3': ['J9', 'J2', 'J2'],
+        'Jubileumplein4': ['J1', 'J13', 'J14'],
+        'Jubileumplein5': ['J15', 'J7', 'J1', 'J15'],
+        'Jubileumplein6': ['J14', 'J2', 'J7', 'J22'],
+        'Jubileumplein7': ['J15', 'J14', 'J7'],
     }
 }
 
 soil_type_lut = {
     'tuinzicht': 'sand',
     'westpolder': 'clay',
+    'woudhuis': 'sand',
+    'hillegersberg': 'sand',
 }
 
 precalc_fp_lut = {

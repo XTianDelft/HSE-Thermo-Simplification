@@ -156,7 +156,7 @@ def visualize(results_name):
     plot_filename = f'results/config_space_plot-{results_name.split(".")[0]}.pdf'
     plt.savefig(plot_filename)
     plt.savefig(plot_filename.replace('.pdf', '.png'), dpi=360)
-    # plt.show()
+    plt.show()
     plt.clf()
 
 if __name__ == '__main__':
