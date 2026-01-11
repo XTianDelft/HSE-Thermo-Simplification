@@ -160,4 +160,4 @@ def visualize(results_name):
     plt.clf()
 
 if __name__ == '__main__':
-    visualize(results_fp)
+    visualize(results_name)

@@ -6,5 +6,6 @@ for area in areas:
         results_fp = f'results-{case}.pkl'
         try:
             visualize(results_fp)
-        except ValueError:
+        except ValueError as e:
+            print(e)
             plt.clf()
