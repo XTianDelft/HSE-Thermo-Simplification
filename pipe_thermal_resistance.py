@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pygfunction as gt
 
+# plot the calculated thermal resistances for the pipes, the COMSOL way as well as the pygfunction way
+
 def COMSOL_convective_thermal_resistances(m_flow_borehole, cross_sect_area, hydraulic_diameter, L_char, mu_f, rho_f, k_f, cp_f):
     Pr = cp_f*mu_f/k_f
 
@@ -16,7 +18,7 @@ def COMSOL_convective_thermal_resistances(m_flow_borehole, cross_sect_area, hydr
     h = Nu*k_f/hydraulic_diameter
     return h
 
-def R_b_pyg(m_flow_borehole, T=3, do_custom_convection = True):
+def R_b_pyg(m_flow_borehole, T=3, fully_water=True, do_custom_convection = True):
     k_s = 1.2     # Soil thermal conductivity
 
     # Borehole dimensions
@@ -43,7 +45,10 @@ def R_b_pyg(m_flow_borehole, T=3, do_custom_convection = True):
 
     # Fluid properties; NOTE: these are different from the values used in COMSOL
     # https://pygfunction.readthedocs.io/en/stable/modules/media.html
-    fluid = gt.media.Fluid('MEG', 14, T=T) # 14% ethylene glycol in water at T=20°C
+    if fully_water:
+        fluid = gt.media.Fluid('MEG', 0, T=T) # water at T=20°C
+    else:
+        fluid = gt.media.Fluid('MEG', 14, T=T) # 14% ethylene glycol in water at T=20°C
     cp_f = fluid.cp     # Fluid specific isobaric heat capacity
     rho_f = fluid.rho   # Fluid density
     mu_f = fluid.mu     # Fluid dynamic viscosity (kg/m.s)
@@ -191,7 +196,6 @@ def R_b_comsol(m_flow_borehole, T_f=3+273.15, Nseg = 10):
     # R_ann_inner_conv = 1 / (h_ann_inner_conv * np.pi * DO_mid)
     # R_ann_outer_conv = 1 / (h_ann_outer_conv * np.pi * DI_out)
 
-
     R_ann_path = R_ann_outer_conv
     R_inner_path = R_in_conv + R_in_pipe + R_mid_gap + R_mid_pipe + R_ann_inner_conv
     R_b = (1/(1/R_inner_path + 1/R_ann_path)) + R_outer_pipe + R_grout
@@ -202,8 +206,9 @@ R_b_comsol_vec = np.vectorize(R_b_comsol)
 
 m_flow_values = np.linspace(0.01, 1, 1000)
 
-plt.plot(m_flow_values, R_b_pyg_vec(m_flow_values), label='pygfunction')
-plt.plot(m_flow_values, R_b_pyg_vec(m_flow_values, do_custom_convection=False), label='pygfunction with COMSOL convection')
+plt.plot(m_flow_values, R_b_pyg_vec(m_flow_values, fully_water=True), label='pygfunction (water)')
+plt.plot(m_flow_values, R_b_pyg_vec(m_flow_values, fully_water=False), label='pygfunction (14% MEG)')
+plt.plot(m_flow_values, R_b_pyg_vec(m_flow_values, fully_water=True, do_custom_convection=False), label='pygfunction (water) with COMSOL convection')
 
 
 # plt.plot(m_flow_values, pyg_thermal_resistances[0], label='pygfunction 1')
@@ -222,7 +227,8 @@ plt.grid(which='minor', color='lightgray')
 plt.xlabel('mass flow through one 50 m borehole (kg/s)')
 plt.ylabel('effective borehole thermal resistance (m.K/W)')
 plt.legend(loc='upper right')
+plt.gcf().set_size_inches(6, 4)
 plt.tight_layout()
-plt.savefig('pipe_thermal_resistance.pdf')
-plt.savefig('pipe_thermal_resistance.png', dpi=360)
+plt.savefig('results/pipe_thermal_resistance.pdf')
+# plt.savefig('pipe_thermal_resistance.png', dpi=360)
 plt.show()

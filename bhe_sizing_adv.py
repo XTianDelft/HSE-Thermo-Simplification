@@ -163,7 +163,7 @@ def size_multiple_cases(cases, profile_root, results_root, precalc_filepath):
 
 
 if __name__ == '__main__':
-    precalc_filepath = results_root + 'precalc_borefields-k_g=2.18-Cp=2.93e+06-T_g=10.0-LOWRES.pkl'
+    precalc_filepath = results_root + 'precalc_borefields-k_g=2.18-Cp=2.93e+06-T_g=10.0-HIGHRES.pkl'
 
     case_name = 'profile-test'
     case_heat_profile = load_profiles_and_sum([f'{case_name}.xlsx'], 'profiles/')

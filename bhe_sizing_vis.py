@@ -9,7 +9,7 @@ import matplotlib.patches as mpatches
 R_max = 25  # max property radius in m
 H_max = 50  # max depth in m
 
-results_name = 'results-Eilandstraat1.pkl'
+results_name = 'results-Eikstraat5.pkl'
 results_root = 'results/'
 results_fp = results_root + results_name
 

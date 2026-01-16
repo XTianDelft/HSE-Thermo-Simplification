@@ -2,6 +2,8 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
+# display some of the precalculated g-functions
+
 precalc_fp = 'results/precalc_borefields-k_g=2.18-Cp=2.93e+06-T_g=10.0-HIGHRES.pkl'
 
 print(f'loading {precalc_fp}')

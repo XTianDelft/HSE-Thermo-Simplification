@@ -23,14 +23,21 @@ def read_hourly_profile(filename):
     # time = df["time"]
     return heat_demand
 
-def plot_duration_curve(heat_demand):
+def plot_duration_curve(heat_demand, mark_peak=False, plot_zeros=True, **kwargs):
     duration_curve = np.sort(heat_demand)
     first_0 = duration_curve.searchsorted(0, side='right')
-    plt.plot(duration_curve[first_0-1:][::-1] / 1e3)
-    # plt.xlim(0, len(heat_demand) - first_0)
+    if not plot_zeros:
+        duration_curve = duration_curve[first_0-1:]
+    duration_curve = duration_curve[::-1]
+    plt.plot(duration_curve, **kwargs)
+    if mark_peak:
+        plt.scatter(0, (duration_curve)[0], zorder=400, clip_on=False)
+    plt.xlim(0, len(duration_curve))
     plt.xlabel('hours of the year')
     plt.ylim(0, None)
-    plt.ylabel('Heating load')
+    # plt.ylabel('heating load')
+    plt.grid()
+    plt.tight_layout()
 
 # returns the baseload per month (in kWh/month) and the peak load per month (in kW/month)
 def read_monthly_profile(filename):

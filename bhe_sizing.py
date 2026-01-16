@@ -36,7 +36,7 @@ profiles_filenames = [
     # 'profile-test3.xlsx',
     # 'profile-test-capped.xlsx',
 
-    '71.xlsx',
+    'A71.xlsx',
     # '69.xlsx',
     # '67.xlsx',
 ]
@@ -64,7 +64,7 @@ load = HourlyBuildingLoad(total_heat_profile/1e3)
 
 
 
-borefield = Borefield(load=load)
+borefield = Borefield()
 
 borefield.THRESHOLD_WARNING_SHALLOW_FIELD = 10
 borefield.ground_data = ground
@@ -84,6 +84,7 @@ gt_borefield = gt.borefield.Borefield(H, 0, r_b, B*np.cos(phis), B*np.sin(phis),
 # gfunc.visualize_g_function()
 # plt.show()
 
+borefield.set_load(load)
 
 borefield.set_borefield(gt_borefield)
 borefield.set_options_gfunction_calculation(options={'linear_threshold': 10*3600})
@@ -104,6 +105,6 @@ print(f"The borefield imbalance is: {borefield.load.imbalance:.0f} kWh/y. (A neg
 Tf = borefield.results.Tf
 
 # plot temperature profile for the calculated borehole length
-plot_temp = False
+plot_temp = True
 if plot_temp:
     borefield.print_temperature_profile(legend=True, plot_hourly=True)
